@@ -88,8 +88,13 @@ class RandomRotation(T.RandomRotation):
         rad = degrees * math.pi / 180
         image = F.rotate(image, degrees)
         if target is not None:
-            matrix = torch.tensor([[math.cos(rad), -math.sin(rad)], [math.sin(rad), math.cos(rad)]], dtype=torch.float32)
-            target['areas'], target['boxes'] = transform_boxes(image, target, matrix)
+            if 'masks' in target:
+                mask = F.rotate(target['masks'], degrees)
+                instances, row, cols = torch.where(mask == 1)
+
+            else:
+                matrix = torch.tensor([[math.cos(rad), -math.sin(rad)], [math.sin(rad), math.cos(rad)]], dtype=torch.float32)
+                target['areas'], target['boxes'] = transform_boxes(image, target, matrix)
         return image, target
 
 class RandomApply(T.RandomApply):

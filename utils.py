@@ -1,10 +1,10 @@
 import argparse
 import json
 import os
-import pickle
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
 
+import skimage.draw
 import torch
 import torch.utils.data
 from PIL import Image
@@ -22,7 +22,7 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
         transform_mapping = {
             'horizontal_flip': RandomHorizontalFlip(0.5),
             'vertical_flip': RandomVerticalFlip(0.5),
-            'rotation': RandomApply([RandomRotation(80)], p=1),
+            'rotation': RandomApply([RandomRotation(80)], p=0),
         }
         for transform in transforms:
             if transform in transform_mapping:
@@ -43,16 +43,14 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         target = {}
         image_id = self.image_ids[index]
-        print(image_id)
-        target['image_id'] = torch.tensor([index])
         image = Image.open(os.path.join(self.image_root, image_id)).convert(mode='RGB')
         width = image.width
         height = image.height
+        # Store the bubbles info
         with open(os.path.join(self.json_root, image_id[:-4] + '.json')) as fp:
             json_data = json.load(fp)
             annotations = json_data['annotations']
-            boxes = []
-            areas = []
+            bubbles = []
             for circle in annotations:
                 if 'ellipse' in circle:
                     ellipse = circle['ellipse']
@@ -60,46 +58,51 @@ class Dataset(torch.utils.data.Dataset):
                     center_y = ellipse['center']['y']
                     radius_x = ellipse['radius']['x']
                     radius_y = ellipse['radius']['y']
-                    x_0 = max(center_x - radius_x, 0)
-                    y_0 = max(center_y - radius_y, 0)
-                    x_1 = min(center_x + radius_x, width - 1)
-                    y_1 = min(center_y + radius_y, height - 1)
-                    if x_1 < 0:
-                        print(center_x)
-                        print(center_y)
-                        print(radius_x)
-                        print(radius_y)
-                    boxes.append(torch.tensor([x_0, y_0, x_1, y_1], dtype=torch.float32))
-                    areas.append((x_1 - x_0) * (y_1 - y_0))
-        boxes = torch.stack(boxes)
-        areas = torch.tensor(areas, dtype=torch.float32)
+                    bubbles.append(torch.tensor([center_x, center_y, radius_x, radius_y]))
+        # Allocate space for mask, boxes, and area
+        mask = torch.zeros((len(bubbles), height, width), dtype=torch.uint8)
+        boxes = torch.empty((len(bubbles), 4), dtype=torch.float32)
+        areas = torch.empty(len(bubbles), dtype=torch.float32)
+        for i, bubble in enumerate(bubbles):
+            center_x = bubble[0]
+            center_y = bubble[1]
+            radius_x = bubble[2]
+            radius_y = bubble[3]
+            # Get coordinates for bounding box, making sure to bound by image size
+            x_0 = max(center_x - radius_x, 0)
+            y_0 = max(center_y - radius_y, 0)
+            x_1 = min(center_x + radius_x, width - 1)
+            y_1 = min(center_y + radius_y, height - 1)
+            # if x_1 < 0:
+                # print(center_x)
+                # print(center_y)
+                # print(radius_x)
+                # print(radius_y)
+            # Save box and area
+            boxes[i, :] = torch.tensor([x_0, y_0, x_1, y_1], dtype=torch.float32)
+            areas[i] = (x_1 - x_0) * (y_1 - y_0)
+            # Generate points for mask
+            rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
+            # Limit these to only points in the image
+            cc = cc[rr < height]
+            rr = rr[rr < height]
+            rr = rr[cc < width]
+            cc = cc[cc < width]
+            cc = cc[rr >= 0]
+            rr = rr[rr >= 0]
+            rr = rr[cc >= 0]
+            cc = cc[cc >= 0]
+            mask[i, rr, cc] = 1
+        # Fill target according to COCO standard
         target['boxes'] = boxes
         target['area'] = areas
         target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
         target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
+        target['masks'] = mask
+        target['image_id'] = torch.tensor([index])
         transform = get_transforms(self.training, self.transforms)
         image, target = transform(image, target)
         return (image, target)
-
-
-        # TODO: process it and return it after transforming it
-        # target = {}
-        # image_id = self.image_ids[index]
-        # target['image_id'] = torch.tensor([index])
-        # image = Image.open(os.path.join(self.root, 'data/%s.jpg' % (image_id)))
-        # transform = get_transforms(self.training, self.transforms)
-        # image = image.convert(mode='RGB')
-        # boxes = self.boxes[image_id].clone().detach()
-        # target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
-        # boxes[:, [0, 2]] *= int(image.width)
-        # boxes[:, [1, 3]] *= int(image.height)
-        # areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 1] - boxes[:, 3])
-        # target['boxes'] = boxes
-        # target['area'] = areas
-        # target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
-        # image, target = transform(image, target)
-        # return (image, target)
-        pass
 
     def __len__(self):
         return len(self.image_ids)

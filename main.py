@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 import torch.multiprocessing as mp
 
-from evaluate import apply, test
 from train import train_model
 from utils import gen_args
 
@@ -15,10 +14,8 @@ def main(args: SimpleNamespace):
         if args.gpu and args.mp:
             mp.spawn(train_model, nprocs=args.gpu, args=(args,))
         train_model(args.gpu, args)
-    if 'test' in args.mode:
-        test(args)
-    if 'apply' in args.mode:
-        apply(args)
+    else:
+        raise ValueError('No valid mode supplied.')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -31,12 +28,12 @@ if __name__ == '__main__':
     parser.add_argument('--opt', type=str, help='Optimizer to train with. Either \'adam\' or \'sgd\'')
     parser.add_argument('--test_dir', type=str, help='Directory to test model on')
     parser.add_argument('--save', type=str, help='File name of saving destination')
-    parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Either \'train\' or \'test\'')
+    parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Available modes include \'train\'')
     parser.add_argument('--mp', action='store_true', help='Whether or not to use multiprocessing')
     parser.add_argument('--nodes', type=int, help='Number of nodes for multiprocessing')
     parser.add_argument('--nr', type=int, help='Index of the current node\'s first rank')
     parser.add_argument('--transforms', type=str, nargs='*', help='Which augmentations to use. Choose some combination of \'vertical_flip\', \'horizontal_flip\', and \'rotation\'')
-    parser.add_argument('--model', type=str, help='Which model architecture to use')
+    parser.add_argument('--model', type=str, help='Which model architecture to use. Available models include \'mask_rcnn\' and \'faster_rcnn\'')
     parser.add_argument('--config', type=str, help='Location of a full configuration file')
     args = parser.parse_args()
     defaults = {

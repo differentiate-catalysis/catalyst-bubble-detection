@@ -1,22 +1,15 @@
-import os
-from types import SimpleNamespace
+from typing import Tuple, Union
 
-import numpy as np
 import torch
 import torch.utils.data
 import torchvision
-import torchvision.transforms as T
-from PIL import Image
+from torch import Tensor
 from torch.nn import Module
 from torch.utils.data import DataLoader
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from tqdm import tqdm
 
-from utils import Dataset, collate_fn
 
-
-def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int):
+def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tuple[Union[float, Tensor], Union[float, Tensor]]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:

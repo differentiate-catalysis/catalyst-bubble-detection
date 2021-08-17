@@ -2,12 +2,13 @@ import math
 import os
 import sys
 from types import SimpleNamespace
-from typing import Tuple
+from typing import Tuple, Union
 
 import ray
 import torch
 import torch.distributed as dist
 import torch.utils.data
+from torch import Tensor
 from torch.nn import Module
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, Optimizer
@@ -105,7 +106,7 @@ def train_model(gpu: int, args: SimpleNamespace):
                 'iou_val_max': iou_max
             }, 'saved/best.pth')
 
-def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[float, float]:
+def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[Union[float, Tensor], Union[float, Tensor]]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:

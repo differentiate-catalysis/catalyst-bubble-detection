@@ -22,7 +22,7 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
         transform_mapping = {
             'horizontal_flip': RandomHorizontalFlip(0.5),
             'vertical_flip': RandomVerticalFlip(0.5),
-            'rotation': RandomApply([RandomRotation(80)], p=0),
+            'rotation': RandomApply([RandomRotation(80)], p=1),
         }
         for transform in transforms:
             if transform in transform_mapping:
@@ -73,11 +73,6 @@ class Dataset(torch.utils.data.Dataset):
             y_0 = max(center_y - radius_y, 0)
             x_1 = min(center_x + radius_x, width - 1)
             y_1 = min(center_y + radius_y, height - 1)
-            # if x_1 < 0:
-                # print(center_x)
-                # print(center_y)
-                # print(radius_x)
-                # print(radius_y)
             # Save box and area
             boxes[i, :] = torch.tensor([x_0, y_0, x_1, y_1], dtype=torch.float32)
             areas[i] = (x_1 - x_0) * (y_1 - y_0)
@@ -100,9 +95,10 @@ class Dataset(torch.utils.data.Dataset):
         target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
         target['masks'] = mask
         target['image_id'] = torch.tensor([index])
+        # Augment the image and target
         transform = get_transforms(self.training, self.transforms)
         image, target = transform(image, target)
-        return (image, target)
+        return image, target
 
     def __len__(self):
         return len(self.image_ids)

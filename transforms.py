@@ -89,9 +89,29 @@ class RandomRotation(T.RandomRotation):
         image = F.rotate(image, degrees)
         if target is not None:
             if 'masks' in target:
+                width, height = F._get_image_size(image)
                 mask = F.rotate(target['masks'], degrees)
-                instances, row, cols = torch.where(mask == 1)
-
+                #instances, row, cols = torch.where(mask == 1)
+                good_instances = torch.where(torch.sum(mask, dim=[-1, -2]) > 0)[0]
+                if good_instances.shape[0] > 0:
+                    mask = mask[good_instances]
+                else:
+                    mask = torch.zeros((1, height, width), dtype=torch.uint8)
+                boxes = torch.empty((mask.shape[0], 4), dtype=torch.float32)
+                areas = torch.empty(mask.shape[0])
+                for i in range(mask.shape[0]):
+                    rows, cols = torch.where(mask[i] == 1)
+                    x_0 = torch.amin(cols)
+                    y_0 = torch.amin(rows)
+                    x_1 = torch.amax(cols)
+                    y_1 = torch.amax(rows)
+                    boxes[i, :] = torch.tensor([x_0, y_0, x_1, y_1], dtype=torch.float32)
+                    areas[i] = (x_1 - x_0) * (y_1 - y_0)
+                target['masks'] = mask
+                target['boxes'] = boxes
+                target['areas'] = areas
+                target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
+                target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
             else:
                 matrix = torch.tensor([[math.cos(rad), -math.sin(rad)], [math.sin(rad), math.cos(rad)]], dtype=torch.float32)
                 target['areas'], target['boxes'] = transform_boxes(image, target, matrix)

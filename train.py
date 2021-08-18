@@ -39,9 +39,11 @@ def train_model(gpu: int, args: SimpleNamespace):
     torch.manual_seed(0)
     if gpu != -1 and torch.cuda.is_available():
         torch.cuda.set_device(gpu)
+        amp = args.amp
         device = torch.device('cuda', gpu)
     else:
         gpu = -1
+        amp = False
         device = torch.device('cpu')
     model = model_mappings[args.model].to(device)
     if args.mp:
@@ -62,11 +64,11 @@ def train_model(gpu: int, args: SimpleNamespace):
     last_loss_eval = float('inf')
     for epoch in range(1, args.epochs + 1):
         # Train for one epoch
-        loss_train = train_epoch(model, optimizer, train_loader, epoch, amp=args.amp, gpu=gpu)
+        loss_train = train_epoch(model, optimizer, train_loader, epoch, amp=amp, gpu=gpu)
         lr_scheduler.step()
 
         # Evaluate
-        loss_eval, iou_eval = evaluate(model, valid_loader, amp=args.amp, gpu=gpu)
+        loss_eval, iou_eval = evaluate(model, valid_loader, amp=amp, gpu=gpu)
 
         # Sync results across all ranks
         if args.mp:
@@ -74,6 +76,7 @@ def train_model(gpu: int, args: SimpleNamespace):
             results[:] = torch.tensor([loss_train, loss_eval, iou_eval], device=device, dtype=torch.float32)
             # Sync the results from all nodes
             for i in range(args.world_size):
+                amp = amp
                 dist.broadcast(results[i], src=i)
             # Combine the results and send to the rest of the group
             results = torch.mean(results, dim=0)
@@ -106,7 +109,7 @@ def train_model(gpu: int, args: SimpleNamespace):
                 'iou_val_max': iou_max
             }, 'saved/best.pth')
 
-def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[Union[float, Tensor], Union[float, Tensor]]:
+def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[float, float]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -119,7 +122,7 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
         warmup_factor = 1. / 1000
         warmup_iters = min(1000, len(train_loader) - 1)
         lr_scheduler = warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
-
+    total_loss = 0
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     for images, targets in tqdm(train_loader, desc='Epoch %d' % (epoch)):
         images = list(image.to(device) for image in images)
@@ -128,6 +131,7 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
             loss_value = losses.item()
+            total_loss += loss_value * train_loader.batch_size
 
         if not math.isfinite(loss_value):
             print(targets)
@@ -144,6 +148,6 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
         optimizer.zero_grad()
 
     print('--- training result ---')
-    print('loss: %.5f' % (loss_value / num_samples))
+    print('loss: %.5f' % (total_loss / num_samples))
 
-    return loss_value / num_samples
+    return total_loss / num_samples

@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tuple[Union[float, Tensor], Union[float, Tensor]]:
+def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tuple[float, float]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -33,7 +33,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
                     dims = iou.shape
                     matrix = torch.zeros((max(dims[0], dims[1]), max(dims[0], dims[1])))
                     matrix[:dims[0], :dims[1]] = iou
-                    total_iou += torch.sum(torch.diagonal(matrix))
+                    total_iou += torch.sum(torch.diagonal(matrix)).item()
                 # Must set model to train mode to get loss
                 model.train()
                 loss_dict = model(images, targets)

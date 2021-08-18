@@ -11,7 +11,7 @@ from PIL import Image
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler
 
-from transforms import (Compose, RandomApply, RandomHorizontalFlip,
+from transforms import (ColorJitter, Compose, RandomApply, RandomHorizontalFlip,
                         RandomRotation, RandomVerticalFlip, ToTensor)
 
 
@@ -23,6 +23,7 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
             'horizontal_flip': RandomHorizontalFlip(0.5),
             'vertical_flip': RandomVerticalFlip(0.5),
             'rotation': RandomApply([RandomRotation(80)], p=1),
+            'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.5, contrast=0.5)], p=0.5),
         }
         for transform in transforms:
             if transform in transform_mapping:

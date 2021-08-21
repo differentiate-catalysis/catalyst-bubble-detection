@@ -8,9 +8,12 @@ import torch.multiprocessing as mp
 from train import train_model
 from utils import gen_args
 
+from conversions import gen_label_images
 
 def main(args: SimpleNamespace):
-    if 'train' in args.mode:
+    if 'gen_labels' in args.mode:
+        gen_label_images(os.path.join(args.root, args.json_dir), os.path.join(args.root, 'labels'))
+    elif 'train' in args.mode:
         if args.gpu and args.mp:
             mp.spawn(train_model, nprocs=args.gpu, args=(args,))
         train_model(args.gpu, args)
@@ -35,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--transforms', type=str, nargs='*', help='Which augmentations to use. Choose some combination of \'vertical_flip\', \'horizontal_flip\', and \'rotation\'')
     parser.add_argument('--model', type=str, help='Which model architecture to use. Available models include \'mask_rcnn\' and \'faster_rcnn\'')
     parser.add_argument('--config', type=str, help='Location of a full configuration file')
+    parser.add_argument('--json_dir', type=str, help='Directory containing JSON files')
     args = parser.parse_args()
     defaults = {
         'root': 'data/bubbles',
@@ -52,7 +56,8 @@ if __name__ == '__main__':
         'nr': 0,
         'transforms': ['rotation', 'horizontal_flip', 'vertical_flip'],
         'model': 'faster_rcnn',
-        'config': None
+        'config': None,
+        'json_dir': 'json',
     }
     if args.config:
         if os.path.isfile(args.config):

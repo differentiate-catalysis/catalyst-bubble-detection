@@ -2,4 +2,5 @@
 */mask_rcnn_bubble_0030.h5
 */*.pyc
 */__pycache__
-
+saved/*
+.idea/*

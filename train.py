@@ -18,9 +18,12 @@ from tqdm import tqdm
 from evaluate import evaluate
 from models import model_mappings
 from utils import get_dataloaders, warmup_lr_scheduler
+import matplotlib.pyplot as plt
 
 
 def train_model(gpu: int, args: SimpleNamespace):
+    loss_train_list = []
+    loss_val_list = []
     if args.mp:
         world_size = args.world_size
         if not hasattr(args, 'ray_checkpoint_dir'):
@@ -70,6 +73,10 @@ def train_model(gpu: int, args: SimpleNamespace):
         # Evaluate
         loss_eval, iou_eval = evaluate(model, valid_loader, amp=amp, gpu=gpu)
 
+        # Append losses to list to graph later
+        loss_train_list.append(loss_train)
+        loss_val_list.append(loss_eval)
+
         # Sync results across all ranks
         if args.mp:
             results = torch.zeros((args.world_size, 3), device=device, dtype=torch.float32)
@@ -108,6 +115,9 @@ def train_model(gpu: int, args: SimpleNamespace):
                 'loss_train': loss_train,
                 'iou_val_max': iou_max
             }, 'saved/best.pth')
+
+        graph(loss_train_list, loss_val_list, 'saved/loss.png')
+
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[float, float]:
     if gpu != -1:
@@ -151,3 +161,13 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
     print('loss: %.5f' % (total_loss / num_samples))
 
     return total_loss / num_samples
+
+def graph(loss_train_list, loss_val_list, save_path):
+    fig, ax = plt.subplots()
+    x = range(len(loss_train_list))
+    ax.plot(x, loss_train_list, label='Training Loss')
+    ax.plot(x, loss_val_list, label='Validation Loss')
+    ax.set(xlabel='Epoch', ylabel='Loss',
+           title='Loss of Model')
+    plt.savefig(save_path)
+    print('Plot saved')

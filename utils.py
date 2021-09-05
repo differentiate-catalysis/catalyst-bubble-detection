@@ -33,13 +33,17 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
     return Compose(composition)
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, root: str, transforms: List[str], training: bool = False):
+    def __init__(self, root: str, transforms: List[str], training: bool = False, num_images: int = -1):
         super(Dataset).__init__()
         self.image_root = os.path.join(root, 'images/')
         self.json_root = os.path.join(root, 'json/')
         self.image_ids = os.listdir(self.image_root)
         self.training = training
         self.transforms = transforms
+        if num_images == -1:
+            self.num_images = len(self.image_ids)
+        else:
+            self.num_images = num_images
 
     def __getitem__(self, index):
         target = {}
@@ -102,13 +106,24 @@ class Dataset(torch.utils.data.Dataset):
         return image, target
 
     def __len__(self):
-        return len(self.image_ids)
+        return self.num_images
+
+    def get_num_labels(self):
+        sum = 0
+        for index in range(self.num_images):
+            image_id = self.image_ids[index]
+            with open(os.path.join(self.json_root, image_id[:-4] + '.json')) as fp:
+                json_data = json.load(fp)
+                annotations = json_data['annotations']
+                sum += len(annotations)
+        return sum
 
 def collate_fn(batch):
     return tuple(zip(*batch))
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
-    training_data = Dataset(os.path.join(args.root, 'train'), args.transforms, True)
+    training_data = Dataset(os.path.join(args.root, 'train'), args.transforms, True, num_images=args.num_images)
+    print("Number of labels in training data: " + str(training_data.get_num_labels()))
     validation_data = Dataset(os.path.join(args.root, 'validation'), args.transforms, False)
 
     if world_size is None or rank is None:

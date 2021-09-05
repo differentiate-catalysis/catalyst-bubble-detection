@@ -101,8 +101,8 @@ def train_model(gpu: int, args: SimpleNamespace):
         # Checkpoint if good result, only checkpoint on one rank
         if iou_eval > iou_max and (rank == None or rank == 0):
             iou_max = iou_eval
-            if not os.path.isdir('saved'):
-                os.mkdir('saved')
+            if not os.path.isdir(args.save):
+                os.mkdir(args.save)
             if args.mp:
                 model_state_dict = model.module.state_dict()
             else:
@@ -114,10 +114,9 @@ def train_model(gpu: int, args: SimpleNamespace):
                 'loss_val': loss_eval,
                 'loss_train': loss_train,
                 'iou_val_max': iou_max
-            }, 'saved/best.pth')
+            }, os.path.join(args.save, 'best.pth'))
 
-        graph(loss_train_list, loss_val_list, 'saved/loss.png')
-
+        graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[float, float]:
     if gpu != -1:
@@ -169,5 +168,6 @@ def graph(loss_train_list, loss_val_list, save_path):
     ax.plot(x, loss_val_list, label='Validation Loss')
     ax.set(xlabel='Epoch', ylabel='Loss',
            title='Loss of Model')
+    plt.legend(loc="upper left")
     plt.savefig(save_path)
     print('Plot saved')

@@ -4,6 +4,7 @@ import sys
 from types import SimpleNamespace
 from typing import Tuple, Union
 
+import matplotlib.pyplot as plt
 import ray
 import torch
 import torch.distributed as dist
@@ -18,7 +19,6 @@ from tqdm import tqdm
 from evaluate import evaluate
 from models import model_mappings
 from utils import get_dataloaders, warmup_lr_scheduler
-import matplotlib.pyplot as plt
 
 
 def train_model(gpu: int, args: SimpleNamespace):

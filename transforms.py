@@ -120,7 +120,7 @@ def target_from_masks(masks: torch.Tensor) -> Dict[str, torch.Tensor]:
     return target
 
 class RandomRotation(T.RandomRotation):
-    def forward(self, image:torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         degrees = self.get_params(self.degrees)
         rad = degrees * math.pi / 180
         image = F.rotate(image, degrees)
@@ -136,7 +136,7 @@ class RandomRotation(T.RandomRotation):
         return image, target
 
 class RandomApply(T.RandomApply):
-    def forward(self, image:torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         if self.p < torch.rand(1):
             return image, target
         for t in self.transforms:
@@ -144,6 +144,6 @@ class RandomApply(T.RandomApply):
         return image, target
 
 class ColorJitter(T.ColorJitter):
-    def forward(self, image:torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image = super().forward(image)
         return image, target

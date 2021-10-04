@@ -2,32 +2,28 @@ import argparse
 import json
 import os
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import skimage.draw
 import torch
+import numpy as np
 import torch.utils.data
 from PIL import Image
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler
+import torchvision
+from torchvision.transforms.functional import to_pil_image
 
-from transforms import (ColorJitter, Compose, RandomApply, RandomHorizontalFlip,
-                        RandomRotation, RandomVerticalFlip, ToTensor)
+from transforms import Compose, ToTensor, transform_mappings
 
 
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
     if training and transforms:
-        transform_mapping = {
-            'horizontal_flip': RandomHorizontalFlip(0.5),
-            'vertical_flip': RandomVerticalFlip(0.5),
-            'rotation': RandomApply([RandomRotation(80)], p=1),
-            'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.5, contrast=0.5)], p=0.5),
-        }
         for transform in transforms:
-            if transform in transform_mapping:
-                composition.append(transform_mapping[transform])
+            if transform in transform_mappings:
+                composition.append(transform_mappings[transform])
             else:
                 raise ValueError('Invalid transform %s supplied' % transform)
     return Compose(composition)
@@ -37,6 +33,7 @@ class Dataset(torch.utils.data.Dataset):
         super(Dataset).__init__()
         self.image_root = os.path.join(root, 'images/')
         self.json_root = os.path.join(root, 'json/')
+        self.target_root = os.path.join(root, 'targets/')
         self.image_ids = os.listdir(self.image_root)
         self.training = training
         self.transforms = transforms
@@ -49,50 +46,14 @@ class Dataset(torch.utils.data.Dataset):
         target = {}
         image_id = self.image_ids[index]
         image = Image.open(os.path.join(self.image_root, image_id)).convert(mode='RGB')
-        width = image.width
-        height = image.height
-        # Store the bubbles info
-        with open(os.path.join(self.json_root, image_id[:-4] + '.json')) as fp:
-            json_data = json.load(fp)
-            annotations = json_data['annotations']
-            bubbles = []
-            for circle in annotations:
-                if 'ellipse' in circle:
-                    ellipse = circle['ellipse']
-                    center_x = ellipse['center']['x']
-                    center_y = ellipse['center']['y']
-                    radius_x = ellipse['radius']['x']
-                    radius_y = ellipse['radius']['y']
-                    bubbles.append(torch.tensor([center_x, center_y, radius_x, radius_y]))
-        # Allocate space for mask, boxes, and area
-        mask = torch.zeros((len(bubbles), height, width), dtype=torch.uint8)
-        boxes = torch.empty((len(bubbles), 4), dtype=torch.float32)
-        areas = torch.empty(len(bubbles), dtype=torch.float32)
-        for i, bubble in enumerate(bubbles):
-            center_x = bubble[0]
-            center_y = bubble[1]
-            radius_x = bubble[2]
-            radius_y = bubble[3]
-            # Get coordinates for bounding box, making sure to bound by image size
-            x_0 = max(center_x - radius_x, 0)
-            y_0 = max(center_y - radius_y, 0)
-            x_1 = min(center_x + radius_x, width - 1)
-            y_1 = min(center_y + radius_y, height - 1)
-            # Save box and area
-            boxes[i, :] = torch.tensor([x_0, y_0, x_1, y_1], dtype=torch.float32)
-            areas[i] = (x_1 - x_0) * (y_1 - y_0)
-            # Generate points for mask
-            rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
-            # Limit these to only points in the image
-            cc = cc[rr < height]
-            rr = rr[rr < height]
-            rr = rr[cc < width]
-            cc = cc[cc < width]
-            cc = cc[rr >= 0]
-            rr = rr[rr >= 0]
-            rr = rr[cc >= 0]
-            cc = cc[cc >= 0]
-            mask[i, rr, cc] = 1
+        mask = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_masks.npy')))
+        boxes = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_boxes.npy')))
+        areas = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_areas.npy')))
+        # masks = torch.sum(mask, dim=0).byte()
+        # masks[masks >= 1] = 255
+        # img = to_pil_image(masks).convert('L')
+        # img.save('/home/jim/masks/%s.png' % image_id)
+
         # Fill target according to COCO standard
         target['boxes'] = boxes
         target['area'] = areas
@@ -127,8 +88,8 @@ def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Opti
     validation_data = Dataset(os.path.join(args.root, 'validation'), args.transforms, False)
 
     if world_size is None or rank is None:
-        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
-        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
+        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)
+        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)
         return train_loader, valid_loader
 
     train_sampler = DistributedSampler(training_data, num_replicas=world_size, rank=rank, drop_last=True)
@@ -148,7 +109,7 @@ def warmup_lr_scheduler(optimizer: Optimizer, warmup_iters: int, warmup_factor: 
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, f)
 
-def gen_args(args: argparse.Namespace, defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> SimpleNamespace:
+def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> SimpleNamespace:
     full_args = defaults.copy()
     if file_args is not None:
         for key, value in file_args.items():

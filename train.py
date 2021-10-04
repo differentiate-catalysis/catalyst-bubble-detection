@@ -15,6 +15,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from ray import tune
 
 from evaluate import evaluate
 from models import model_mappings
@@ -26,7 +27,7 @@ def train_model(gpu: int, args: SimpleNamespace):
     loss_val_list = []
     if args.mp:
         world_size = args.world_size
-        if not hasattr(args, 'ray_checkpoint_dir'):
+        if not tune.is_session_enabled():
             rank = args.nr * args.gpu + gpu
             dist.init_process_group(
                 backend='nccl',
@@ -56,22 +57,55 @@ def train_model(gpu: int, args: SimpleNamespace):
     if args.opt.lower() == 'adam':
         optimizer = Adam(params, lr=args.lr)
     elif args.opt.lower() == 'sgd':
-        optimizer = SGD(params, lr=args.lr, momentum=0.9, weight_decay=0.0005)
+        optimizer = SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=0.0005)
     else:
         raise ValueError('Invalid optimizer specified')
     # Lower LR every 3 epochs
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.00001)
     train_loader, valid_loader = get_dataloaders(args, world_size, rank)
     iou_max = 0
+    model_dir = os.path.join(args.save, '%s.pth' % args.name)
+    epoch_init = 1
     last_loss_train = float('inf')
     last_loss_eval = float('inf')
-    for epoch in range(1, args.epochs + 1):
+    if args.checkpoint:
+        checkpoint = torch.load(args.checkpoint)
+        try:
+            if args.mp:
+                model.module.load_state_dict(checkpoint['model_state_dict'])
+            else:
+                model.load_state_dict(checkpoint['model_state_dict'])
+            if not tune.is_session_enabled():
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            print('Successfuly loaded checkpoint')
+        except:
+            print('Failed to load checkpoint. Training from scratch...')
+    elif os.path.isfile(model_dir):
+        continue_training = input('Found a model that was already saved! Load from checkpoint? (y/n) ').lower() if args.prompt else 'n'
+        if continue_training == 'y' or continue_training == 'ye' or continue_training == 'yes':
+            try:
+                checkpoint = torch.load(model_dir)
+                if args.mp:
+                    model.module.load_state_dict(checkpoint['model_state_dict'])
+                else:
+                    model.load_state_dict(checkpoint['model_state_dict'])
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                last_loss_train = checkpoint['loss_train']
+                last_loss_eval = checkpoint['loss_val']
+                epoch_init = checkpoint['epoch'] + 1
+                iou_max = checkpoint['iou_val_max']
+                print('Successfuly loaded checkpoint, continuing from epoch %d of %d...' % (epoch_init, args.epochs))
+            except:
+                print('Failed to load checkpoint. Training from scratch...')
+        else:
+            print('Did not load checkpoint. Training from scratch...')
+    for epoch in range(epoch_init, args.epochs + 1):
         # Train for one epoch
         loss_train = train_epoch(model, optimizer, train_loader, epoch, amp=amp, gpu=gpu)
         lr_scheduler.step()
 
         # Evaluate
-        loss_eval, iou_eval = evaluate(model, valid_loader, amp=amp, gpu=gpu)
+        loss_eval, iou_eval, mAP_eval = evaluate(model, valid_loader, amp=amp, gpu=gpu)
 
         # Append losses to list to graph later
         loss_train_list.append(loss_train)
@@ -79,15 +113,15 @@ def train_model(gpu: int, args: SimpleNamespace):
 
         # Sync results across all ranks
         if args.mp:
-            results = torch.zeros((args.world_size, 3), device=device, dtype=torch.float32)
-            results[:] = torch.tensor([loss_train, loss_eval, iou_eval], device=device, dtype=torch.float32)
+            results = torch.zeros((args.world_size, 4), device=device, dtype=torch.float32)
+            results[:] = torch.tensor([loss_train, loss_eval, iou_eval, mAP_eval], device=device, dtype=torch.float32)
             # Sync the results from all nodes
             for i in range(args.world_size):
                 amp = amp
                 dist.broadcast(results[i], src=i)
             # Combine the results and send to the rest of the group
             results = torch.mean(results, dim=0)
-            loss_train, loss_eval, iou_eval = results.to(torch.device('cpu'))
+            loss_train, loss_eval, iou_eval, mAP_eval = results.to(torch.device('cpu'))
 
         # Stop on overfit
         if loss_train - last_loss_train < 0 and loss_eval - last_loss_eval > 0:
@@ -98,8 +132,20 @@ def train_model(gpu: int, args: SimpleNamespace):
         last_loss_train = loss_train
         last_loss_eval = last_loss_eval
 
+        if tune.is_session_enabled():
+            if isinstance(loss_eval, torch.Tensor):
+                loss_eval = loss_eval.to(torch.device('cpu')).item()
+            if isinstance(iou_eval, torch.Tensor):
+                iou_eval = iou_eval.to(torch.device('cpu')).item()
+            if isinstance(mAP_eval, torch.Tensor):
+                mAP_eval = mAP_eval.to(torch.device('cpu')).item()
+
+            tune.report(loss=loss_eval, iou=iou_eval, map=mAP_eval)
+            with args.ray_checkpoint_dir(step=epoch) as checkpoint_dir:
+                model_dir = os.path.join(checkpoint_dir, '../best.pth')
+
         # Checkpoint if good result, only checkpoint on one rank
-        if iou_eval > iou_max and (rank == None or rank == 0):
+        if (iou_eval > iou_max or tune.is_session_enabled()) and (rank == None or rank == 0):
             iou_max = iou_eval
             if not os.path.isdir(args.save):
                 os.mkdir(args.save)
@@ -114,9 +160,10 @@ def train_model(gpu: int, args: SimpleNamespace):
                 'loss_val': loss_eval,
                 'loss_train': loss_train,
                 'iou_val_max': iou_max
-            }, os.path.join(args.save, 'best.pth'))
+            }, model_dir)
 
-        graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
+        if args.graph:
+            graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[float, float]:
     if gpu != -1:
@@ -143,9 +190,10 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
             total_loss += loss_value * train_loader.batch_size
 
         if not math.isfinite(loss_value):
-            print(targets)
             print('Loss is %s, stopping training' % loss_value)
-            print(loss_dict)
+            if tune.is_session_enabled():
+                print("Hi im in tune")
+                tune.report(loss=10000, iou=0, map=0)
             sys.exit(1)
 
         scaler.scale(losses).backward()

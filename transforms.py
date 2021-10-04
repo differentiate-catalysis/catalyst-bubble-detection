@@ -147,3 +147,23 @@ class ColorJitter(T.ColorJitter):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image = super().forward(image)
         return image, target
+
+class RandomAdjustSharpness(T.RandomAdjustSharpness):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image = super().forward(image)
+        return image, target
+
+class GaussianBlur(T.GaussianBlur):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image = super().forward(image)
+        return image, target
+
+
+transform_mappings = {
+    'horizontal_flip': RandomHorizontalFlip(0.5),
+    'vertical_flip': RandomVerticalFlip(0.5),
+    'rotation': RandomRotation(80),
+    'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.5, contrast=0.5)], p=0.5),
+    'blur': RandomApply([GaussianBlur(3)], p=0.5),
+    'sharpness': RandomAdjustSharpness(1.2, 0.5)
+}

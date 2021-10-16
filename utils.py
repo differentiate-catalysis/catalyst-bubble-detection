@@ -34,20 +34,21 @@ class Dataset(torch.utils.data.Dataset):
     def __init__(self, root: str, transforms: List[str], training: bool = False, num_images: int = -1):
         super(Dataset).__init__()
         self.image_root = os.path.join(root, 'images/')
+        self.patch_root = os.path.join(root, 'patches/')
         self.json_root = os.path.join(root, 'json/')
         self.target_root = os.path.join(root, 'targets/')
-        self.image_ids = os.listdir(self.image_root)
+        self.image_ids = os.listdir(self.patch_root)
         self.training = training
         self.transforms = transforms
         if num_images == -1:
-            self.num_images = len(self.image_ids)
+            self.num_images = len(os.listdir(self.image_root))
         else:
             self.num_images = num_images
 
     def __getitem__(self, index):
         target = {}
         image_id = self.image_ids[index]
-        image = Image.open(os.path.join(self.image_root, image_id)).convert(mode='RGB')
+        image = Image.open(os.path.join(self.patch_root, image_id)).convert(mode='RGB')
         mask = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_masks.npy')))
         boxes = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_boxes.npy')))
         areas = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_areas.npy')))
@@ -69,12 +70,12 @@ class Dataset(torch.utils.data.Dataset):
         return image, target
 
     def __len__(self):
-        return self.num_images
+        return len(self.image_ids)
 
     def get_num_labels(self):
         sum = 0
         for index in range(self.num_images):
-            image_id = self.image_ids[index]
+            image_id = os.listdir(self.image_root)[index]
             with open(os.path.join(self.json_root, image_id[:-4] + '.json')) as fp:
                 json_data = json.load(fp)
                 annotations = json_data['annotations']

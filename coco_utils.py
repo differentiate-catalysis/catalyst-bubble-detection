@@ -8,6 +8,7 @@ import transforms as T
 from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
 
+# Code from PyTorch Object Detection Examples
 
 class FilterAndRemapCocoCategories(object):
     def __init__(self, categories, remap=True):

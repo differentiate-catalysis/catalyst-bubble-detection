@@ -56,8 +56,8 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
                         masks = output['masks']
                         masks = torch.sum(masks, dim=0).byte()
                         masks[masks >= 1] = 255
-                        # img = to_pil_image(masks).convert('L')
-                        # img.save('/home/jim/outmasks/%d.png' % (j * valid_loader.batch_size + i))
+                        img = to_pil_image(masks).convert('L')
+                        img.save('/home/jim/outmasks/%d.png' % (j * valid_loader.batch_size + i))
                     # print(outputs)
                     # iou = torchvision.ops.box_iou(output['boxes'], target['boxes'])
                     # dims = iou.shape

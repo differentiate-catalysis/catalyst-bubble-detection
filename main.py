@@ -69,6 +69,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', type=str, help='Name of the model')
     parser.add_argument('--graph', action='store_true', help='Whether or not to save a plot of the results')
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
+    parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
 
     args = parser.parse_args()
     defaults = {
@@ -106,7 +107,8 @@ if __name__ == '__main__':
         'jobs': 4,
         'name': 'bubbles',
         'graph': False,
-        'run_dir': 'runinfo'
+        'run_dir': 'runinfo',
+        'patch_size': 300
     }
     if args.config:
         if os.path.isfile(args.config):

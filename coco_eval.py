@@ -10,6 +10,7 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from tqdm import tqdm
 
+# Code from PyTorch Object Detection Examples
 
 class CocoEvaluator:
     def __init__(self, coco_gt, iou_types):

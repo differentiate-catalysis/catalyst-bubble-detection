@@ -1,7 +1,11 @@
 import json
 import os
+
+import torch
+from transforms import target_from_masks
 import skimage.draw
 import numpy as np
+import math
 import parsl
 from parsl import python_app
 from parsl.config import Config
@@ -51,7 +55,7 @@ def gen_label_images(indir: str, outdir: str) -> None:
         image.save(os.path.join(outdir, os.path.splitext(os.path.split(json_data['filename'])[1])[0] + '.png'))
 
 @python_app
-def convert_to_targets(image_root, json_root, output_dir, image_name):
+def convert_to_targets(image_root, json_root, image_output_dir, target_output_dir, image_name, patch_size):
     image = Image.open(os.path.join(image_root, image_name)).convert(mode='RGB')
     width = image.width
     height = image.height
@@ -68,23 +72,14 @@ def convert_to_targets(image_root, json_root, output_dir, image_name):
                 radius_y = ellipse['radius']['y']
                 bubbles.append(np.array([center_x, center_y, radius_x, radius_y]))
 
-    # Allocate space for mask, boxes, and area
+    # Allocate space for mask
     mask = np.zeros((len(bubbles), height, width), dtype=np.uint8)
-    boxes = np.empty((len(bubbles), 4), dtype=np.float32)
-    areas = np.empty(len(bubbles), dtype=np.float32)
+
     for i, bubble in enumerate(bubbles):
         center_x = bubble[0]
         center_y = bubble[1]
         radius_x = bubble[2]
         radius_y = bubble[3]
-        # Get coordinates for bounding box, making sure to bound by image size
-        x_0 = max(center_x - radius_x, 0)
-        y_0 = max(center_y - radius_y, 0)
-        x_1 = min(center_x + radius_x, width - 1)
-        y_1 = min(center_y + radius_y, height - 1)
-        # Save box and area
-        boxes[i, :] = np.array([x_0, y_0, x_1, y_1], dtype=np.float32)
-        areas[i] = (x_1 - x_0) * (y_1 - y_0)
         # Generate points for mask
         rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
         # Limit these to only points in the image
@@ -98,9 +93,42 @@ def convert_to_targets(image_root, json_root, output_dir, image_name):
         cc = cc[cc >= 0]
         mask[i, rr, cc] = 1
 
-    np.save(os.path.join(output_dir, image_name[:-4] + '_masks.npy'), mask)
-    np.save(os.path.join(output_dir, image_name[:-4] + '_boxes.npy'), boxes)
-    np.save(os.path.join(output_dir, image_name[:-4] + '_areas.npy'), areas)
+    # Prepare for patching
+    image = np.asarray(image)
+    n_patches_w = math.ceil(width / patch_size)
+    overlap_w = n_patches_w * patch_size - width
+    n_overlaps_w = n_patches_w - 1
+    # Concept: Be on the lookout for magic camels.
+    overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w))
+    overlaps_w[0] = 0
+    dec_indices = np.random.default_rng().choice(n_overlaps_w, size=((-overlap_w % n_overlaps_w)), replace=False) + 1
+    overlaps_w[dec_indices] -= 1
+
+    n_patches_h = math.ceil(height / patch_size)
+    overlap_h = n_patches_h * patch_size - height
+    n_overlaps_h = n_patches_h - 1
+    overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h))
+    dec_indices = np.random.default_rng().choice(n_overlaps_h, size=((-overlap_h % n_overlaps_h)), replace=False) + 1
+    overlaps_h[dec_indices] -= 1
+    overlaps_h[0] = 0
+
+    for i in range(n_patches_w):
+        for j in range(n_patches_h):
+            patch = image[patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i], :]
+            masks = mask[:, patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i]]
+
+            target = target_from_masks(torch.from_numpy(masks))
+            masks = target['masks'].numpy()
+            boxes = target['boxes'].numpy()
+            areas = target['areas'].numpy()
+            image_out = Image.fromarray(patch, mode='RGB')
+
+            # Only save patches with bubbles in them
+            if 0 not in masks.shape:
+                image_out.save(os.path.join(image_output_dir, '%s_%d_%d.png' % (image_name[:-4], i, j)))
+                np.save(os.path.join(target_output_dir, '%s_%d_%d_masks.npy' % (image_name[:-4], i, j)), masks)
+                np.save(os.path.join(target_output_dir, '%s_%d_%d_boxes.npy' % (image_name[:-4], i, j)), boxes)
+                np.save(os.path.join(target_output_dir, '%s_%d_%d_areas.npy' % (image_name[:-4], i, j)), areas)
 
 def gen_targets(args):
     local_threads = Config(
@@ -125,11 +153,14 @@ def gen_targets(args):
             os.mkdir(split_dir)
         image_root = os.path.join(split_dir, 'images')
         json_root = os.path.join(split_dir, 'json')
-        output_dir = os.path.join(split_dir, 'targets')
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
+        target_output_dir = os.path.join(split_dir, 'targets')
+        image_output_dir = os.path.join(split_dir, 'patches')
+        if not os.path.isdir(target_output_dir):
+            os.mkdir(target_output_dir)
+        if not os.path.isdir(image_output_dir):
+            os.mkdir(image_output_dir)
         for image_name in os.listdir(image_root):
-            workers.append(convert_to_targets(image_root, json_root, output_dir, image_name))
+            workers.append(convert_to_targets(image_root, json_root, image_output_dir, target_output_dir, image_name, args.patch_size))
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()

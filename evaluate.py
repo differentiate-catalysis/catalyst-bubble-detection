@@ -1,16 +1,20 @@
 import math
 import sys
-from typing import Tuple, List
-from ray import tune
+from typing import List, Tuple
+from utils import get_iou_types
 
 import torch
 import torch.utils.data
 import torchvision
+from ray import tune
 from torch import Tensor
 from torch.nn import Module
 from torch.utils.data import DataLoader
 from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
+
+from coco_eval import CocoEvaluator
+from coco_utils import get_coco_api_from_dataset
 
 
 def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tuple[float, float, float]:
@@ -27,11 +31,17 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
         boxes = []
         target_boxes = []
         scores = []
+        coco = get_coco_api_from_dataset(valid_loader.dataset)
+        iou_types = get_iou_types(model)
+        coco_evaluator = CocoEvaluator(coco, iou_types)
         for j, (images, targets) in enumerate(tqdm(valid_loader)):
             images = list(image.to(device) for image in images)
             targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
             with torch.cuda.amp.autocast(enabled=amp):
                 outputs = model(images)
+                outputs_cpu = [{k: v.to('cpu') for k, v in t.items()} for t in outputs]
+                res = {target["image_id"].item(): output for target, output in zip(targets, outputs_cpu)}
+                coco_evaluator.update(res)
                 # print(outputs.shape)
                 for i in range(len(targets)):
                     output = outputs[i]
@@ -65,7 +75,12 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
                     tune.report(loss=10000, iou=0, map=0)
                 sys.exit(1)
             total_loss += loss * valid_loader.batch_size
+        coco_evaluator.synchronize_between_processes()
+        coco_evaluator.accumulate()
+        stats = coco_evaluator.summarize()
+        # print(stats)
         mAP, iou = get_metrics(boxes, scores, target_boxes, device, 0.5)
+        mAP = stats[0][0]
         print('--- evaluation result ---')
         print('loss: %.5f, mAP %.5f, IoU %.5f' % (total_loss / num_samples, mAP, iou))
 

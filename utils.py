@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import skimage.draw
 import torch
 import numpy as np
+from torch.nn.modules.module import Module
 import torch.utils.data
 from PIL import Image
 from torch.optim import Optimizer
@@ -15,6 +16,7 @@ import torchvision
 from torchvision.transforms.functional import to_pil_image
 
 from transforms import Compose, ToTensor, transform_mappings
+import pickle
 
 
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
@@ -122,3 +124,57 @@ def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, f
     if config:
         full_args['config'] = config
     return SimpleNamespace(**full_args)
+
+def get_iou_types(model: Module):
+    model_without_ddp = model
+    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+        model_without_ddp = model.module
+    iou_types = ["bbox"]
+    if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
+        iou_types.append("segm")
+    if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
+        iou_types.append("keypoints")
+    return iou_types
+
+def all_gather(data):
+    """
+    Run all_gather on arbitrary picklable data (not necessarily tensors)
+    Args:
+        data: any picklable object
+    Returns:
+        list[data]: list of data gathered from each rank
+    """
+    # world_size = get_world_size()
+    world_size = 1
+    if world_size == 1:
+        return [data]
+
+    # serialized to a Tensor
+    buffer = pickle.dumps(data)
+    storage = torch.ByteStorage.from_buffer(buffer)
+    tensor = torch.ByteTensor(storage).to("cuda")
+
+    # obtain Tensor size of each rank
+    local_size = torch.tensor([tensor.numel()], device="cuda")
+    size_list = [torch.tensor([0], device="cuda") for _ in range(world_size)]
+    torch.distributed.all_gather(size_list, local_size)
+    size_list = [int(size.item()) for size in size_list]
+    max_size = max(size_list)
+
+    # receiving Tensor from all ranks
+    # we pad the tensor because torch all_gather does not support
+    # gathering tensors of different shapes
+    tensor_list = []
+    for _ in size_list:
+        tensor_list.append(torch.empty((max_size,), dtype=torch.uint8, device="cuda"))
+    if local_size != max_size:
+        padding = torch.empty(size=(max_size - local_size,), dtype=torch.uint8, device="cuda")
+        tensor = torch.cat((tensor, padding), dim=0)
+    torch.distributed.all_gather(tensor_list, tensor)
+
+    data_list = []
+    for size, tensor in zip(size_list, tensor_list):
+        buffer = tensor.cpu().numpy().tobytes()[:size]
+        data_list.append(pickle.loads(buffer))
+
+    return data_list

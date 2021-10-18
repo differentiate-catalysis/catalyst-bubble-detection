@@ -52,12 +52,12 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
                     target_boxes.append(target['boxes'])
                     scores.append(nms_scores)
 
-                    if 'masks' in output:
-                        masks = output['masks']
-                        masks = torch.sum(masks, dim=0).byte()
-                        masks[masks >= 1] = 255
-                        img = to_pil_image(masks).convert('L')
-                        img.save('/home/jim/outmasks/%d.png' % (j * valid_loader.batch_size + i))
+                    # if 'masks' in output:
+                        # masks = output['masks']
+                        # masks = torch.sum(masks, dim=0).byte()
+                        # masks[masks >= 1] = 255
+                        # img = to_pil_image(masks).convert('L')
+                        # img.save('/home/jim/outmasks/%d.png' % (j * valid_loader.batch_size + i))
                     # print(outputs)
                     # iou = torchvision.ops.box_iou(output['boxes'], target['boxes'])
                     # dims = iou.shape
@@ -73,7 +73,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
                 print('Loss is %s, stopping training' % loss)
                 if tune.is_session_enabled():
                     tune.report(loss=10000, iou=0, map=0)
-                sys.exit(1)
+                return 10000, 0, 0
             total_loss += loss * valid_loader.batch_size
         coco_evaluator.synchronize_between_processes()
         coco_evaluator.accumulate()

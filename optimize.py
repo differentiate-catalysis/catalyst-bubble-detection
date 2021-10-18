@@ -129,7 +129,7 @@ def optimize(args):
         print('Best trial final validation iou: {}'.format(
             best_trial.last_result['iou']))
         print('Best Checkpoint Dir: ' + str(best_trial.checkpoint.value))
-        checkpoint = [file for file in os.listdir(best_trial.checkpoint.value) if 'pth' in file and args.name in file]
+        checkpoint = [file for file in os.listdir(best_trial.checkpoint.value) if 'best.pth' in file]
         if len(checkpoint) > 0:
             checkpoint = checkpoint[0]
         else:
@@ -144,15 +144,13 @@ def optimize(args):
                 }, os.path.join(name_dir, 'best.pth')
         )
         config_out = best_trial.config.copy()
-        config_out['num_patches'] = [-(args.image_size[0] // -config_out['patch_size']), -(args.image_size[1] // -config_out['patch_size'])]
-        config_out['root'] = 'data/HandSeg_Reserved'
+        config_out['root'] = args.root#'data/HandSeg_Reserved'
         config_out['mp'] = args.mp
         config_out['gpu'] = args.gpu
         config_out['amp'] = args.amp
+        config_out['patch'] = args.patch_size
         config_out['name'] = '%s_optimized' % args.name
         config_out['version'] = 0
         config_out['test_dir'] = 'test'
-        config_out['image_size'] = args.image_size
-        config_out['blocks'] = args.blocks
         with open(os.path.join(name_dir, 'best.json'), 'w') as f:
             json.dump(config_out, f, indent=4)

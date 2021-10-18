@@ -70,6 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--graph', action='store_true', help='Whether or not to save a plot of the results')
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
     parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
+    parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
 
     args = parser.parse_args()
     defaults = {
@@ -108,7 +109,8 @@ if __name__ == '__main__':
         'name': 'bubbles',
         'graph': False,
         'run_dir': 'runinfo',
-        'patch_size': 300
+        'patch_size': 300,
+        'split': [0.1, 0.2, 0.7],
     }
     if args.config:
         if os.path.isfile(args.config):

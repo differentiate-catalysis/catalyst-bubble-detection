@@ -142,7 +142,7 @@ def train_model(gpu: int, args: SimpleNamespace):
 
             tune.report(loss=loss_eval, iou=iou_eval, map=mAP_eval)
             with args.ray_checkpoint_dir(step=epoch) as checkpoint_dir:
-                model_dir = os.path.join(checkpoint_dir, '../best.pth')
+                model_dir = os.path.join(checkpoint_dir, 'best.pth')
 
         # Checkpoint if good result, only checkpoint on one rank
         if (iou_eval > iou_max or tune.is_session_enabled()) and (rank == None or rank == 0):
@@ -165,7 +165,7 @@ def train_model(gpu: int, args: SimpleNamespace):
         if args.graph:
             graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
 
-def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> Tuple[float, float]:
+def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> float:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -192,9 +192,8 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
         if not math.isfinite(loss_value):
             print('Loss is %s, stopping training' % loss_value)
             if tune.is_session_enabled():
-                print("Hi im in tune")
                 tune.report(loss=10000, iou=0, map=0)
-            sys.exit(1)
+            return 10000
 
         scaler.scale(losses).backward()
         scaler.step(optimizer)

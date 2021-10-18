@@ -33,17 +33,17 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, root: str, transforms: List[str], training: bool = False, num_images: int = -1):
         super(Dataset).__init__()
-        self.image_root = os.path.join(root, 'images/')
+        # self.image_root = os.path.join(root, '..', 'images/')
         self.patch_root = os.path.join(root, 'patches/')
-        self.json_root = os.path.join(root, 'json/')
+        # self.json_root = os.path.join(root, '..', 'json/')
         self.target_root = os.path.join(root, 'targets/')
         self.image_ids = os.listdir(self.patch_root)
         self.training = training
         self.transforms = transforms
-        if num_images == -1:
-            self.num_images = len(os.listdir(self.image_root))
-        else:
-            self.num_images = num_images
+        # if num_images == -1:
+            # self.num_images = len(os.listdir(self.image_root))
+        # else:
+            # self.num_images = num_images
 
     def __getitem__(self, index):
         target = {}
@@ -74,21 +74,21 @@ class Dataset(torch.utils.data.Dataset):
 
     def get_num_labels(self):
         sum = 0
-        for index in range(self.num_images):
-            image_id = os.listdir(self.image_root)[index]
-            with open(os.path.join(self.json_root, image_id[:-4] + '.json')) as fp:
-                json_data = json.load(fp)
-                annotations = json_data['annotations']
-                sum += len(annotations)
+        # for index in range(self.num_images):
+            # image_id = os.listdir(self.image_root)[index]
+            # with open(os.path.join(self.json_root, image_id[:-4] + '.json')) as fp:
+                # json_data = json.load(fp)
+                # annotations = json_data['annotations']
+                # sum += len(annotations)
         return sum
 
 def collate_fn(batch):
     return tuple(zip(*batch))
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
-    training_data = Dataset(os.path.join(args.root, 'train'), args.transforms, True, num_images=args.num_images)
+    training_data = Dataset(os.path.join(args.root, args.name, 'train'), args.transforms, True, num_images=args.num_images)
     print("Number of labels in training data: " + str(training_data.get_num_labels()))
-    validation_data = Dataset(os.path.join(args.root, 'validation'), args.transforms, False)
+    validation_data = Dataset(os.path.join(args.root, args.name, 'validation'), args.transforms, False)
 
     if world_size is None or rank is None:
         train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)

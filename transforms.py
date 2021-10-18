@@ -102,7 +102,7 @@ def target_from_masks(masks: torch.Tensor) -> Dict[str, torch.Tensor]:
             areas[i] = (x_1 - x_0) * (y_1 - y_0)
             # If an instance has width or height 0, discard it
             if x_0 == x_1 or y_0 == y_1:
-                proper_instances.remove(i)
+               proper_instances.remove(i)
         masks = masks[proper_instances]
         boxes = boxes[proper_instances]
         areas = areas[proper_instances]
@@ -128,6 +128,9 @@ class RandomRotation(T.RandomRotation):
             if 'masks' in target:
                 mask = F.rotate(target['masks'], degrees)
                 corrected_target = target_from_masks(mask)
+                # If we only have degenerate boxes, ignore the rotation
+                if 0 in corrected_target['boxes'].shape:
+                    return image, target
                 for key, value in corrected_target.items():
                     target[key] = value
             else:

@@ -4,6 +4,7 @@ import os
 import torch
 from transforms import target_from_masks
 import skimage.draw
+import shutil
 import numpy as np
 import math
 import parsl
@@ -55,7 +56,7 @@ def gen_label_images(indir: str, outdir: str) -> None:
         image.save(os.path.join(outdir, os.path.splitext(os.path.split(json_data['filename'])[1])[0] + '.png'))
 
 @python_app
-def convert_to_targets(image_root, json_root, image_output_dir, target_output_dir, image_name, patch_size):
+def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size, splits):
     image = Image.open(os.path.join(image_root, image_name)).convert(mode='RGB')
     width = image.width
     height = image.height
@@ -99,18 +100,20 @@ def convert_to_targets(image_root, json_root, image_output_dir, target_output_di
     overlap_w = n_patches_w * patch_size - width
     n_overlaps_w = n_patches_w - 1
     # Concept: Be on the lookout for magic camels.
-    overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w))
-    overlaps_w[0] = 0
+    overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w)) // n_overlaps_w
     dec_indices = np.random.default_rng().choice(n_overlaps_w, size=((-overlap_w % n_overlaps_w)), replace=False) + 1
     overlaps_w[dec_indices] -= 1
+    overlaps_w[0] = 0
+    overlaps_w = np.cumsum(overlaps_w)
 
     n_patches_h = math.ceil(height / patch_size)
     overlap_h = n_patches_h * patch_size - height
     n_overlaps_h = n_patches_h - 1
-    overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h))
+    overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h)) // n_overlaps_h
     dec_indices = np.random.default_rng().choice(n_overlaps_h, size=((-overlap_h % n_overlaps_h)), replace=False) + 1
     overlaps_h[dec_indices] -= 1
     overlaps_h[0] = 0
+    overlaps_h = np.cumsum(overlaps_h)
 
     for i in range(n_patches_w):
         for j in range(n_patches_h):
@@ -124,7 +127,17 @@ def convert_to_targets(image_root, json_root, image_output_dir, target_output_di
             image_out = Image.fromarray(patch, mode='RGB')
 
             # Only save patches with bubbles in them
-            if 0 not in masks.shape:
+            if 0 not in masks.shape and 0 not in boxes.shape:
+                rand_num = torch.rand(1)
+                if rand_num < splits[0]:
+                    split = 'test'
+                elif rand_num < splits[0] + splits[1]:
+                    split = 'validation'
+                else:
+                    split = 'train'
+                split_dir = os.path.join(trial_dir, split)
+                target_output_dir = os.path.join(split_dir, 'targets')
+                image_output_dir = os.path.join(split_dir, 'patches')
                 image_out.save(os.path.join(image_output_dir, '%s_%d_%d.png' % (image_name[:-4], i, j)))
                 np.save(os.path.join(target_output_dir, '%s_%d_%d_masks.npy' % (image_name[:-4], i, j)), masks)
                 np.save(os.path.join(target_output_dir, '%s_%d_%d_boxes.npy' % (image_name[:-4], i, j)), boxes)
@@ -147,20 +160,35 @@ def gen_targets(args):
     parsl.load(local_threads)
     workers = []
     splits = ['train', 'validation', 'test']
+    trial_dir = os.path.join(args.root, args.name)
+    if not os.path.isdir(trial_dir):
+        os.mkdir(trial_dir)
+    image_root = os.path.join(args.root, 'images')
+    json_root = os.path.join(args.root, 'json')
+    torch.manual_seed(8995)
+
     for split in splits:
-        split_dir = os.path.join(args.root, split)
-        if not os.path.isdir(split_dir):
+        split_dir = os.path.join(trial_dir, split)
+        if os.path.isdir(split_dir):
+            delete = 'y'
+            if args.prompt:
+                delete = input('%s dir found! Wipe? (Y/n)' % split.capitalize())
+            if delete.lower() in ['y', 'ye', 'yes']:
+                shutil.rmtree(split_dir)
+                os.mkdir(split_dir)
+            else:
+                continue
+        else:
             os.mkdir(split_dir)
-        image_root = os.path.join(split_dir, 'images')
-        json_root = os.path.join(split_dir, 'json')
         target_output_dir = os.path.join(split_dir, 'targets')
         image_output_dir = os.path.join(split_dir, 'patches')
         if not os.path.isdir(target_output_dir):
             os.mkdir(target_output_dir)
         if not os.path.isdir(image_output_dir):
             os.mkdir(image_output_dir)
-        for image_name in os.listdir(image_root):
-            workers.append(convert_to_targets(image_root, json_root, image_output_dir, target_output_dir, image_name, args.patch_size))
+
+    for image_name in os.listdir(image_root):
+        workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, args.split))
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()

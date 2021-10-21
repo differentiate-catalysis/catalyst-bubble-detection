@@ -61,7 +61,7 @@ def train_model(gpu: int, args: SimpleNamespace):
     else:
         raise ValueError('Invalid optimizer specified')
     # Lower LR every 3 epochs
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.00001)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=args.gamma)
     train_loader, valid_loader = get_dataloaders(args, world_size, rank)
     iou_max = 0
     model_dir = os.path.join(args.save, '%s.pth' % args.name)

@@ -92,6 +92,7 @@ def optimize(args):
         'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs, args.max_epochs+1)),
         'patch_size': tune.sample_from(pick_patch_size(args)),
         'transforms': tune.sample_from(pick_transforms(args)),
+        'gamma': tune.loguniform(args.min_gamma, args.max_gamma),
     }
     if not os.path.isdir(name_dir):
         os.mkdir(name_dir)

@@ -62,6 +62,10 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs', type=int, help='Maximum number of epochs for HPO')
     parser.add_argument('--min_momentum', type=float, help='Minimum momentum for HPO')
     parser.add_argument('--max_momentum', type=float, help='Maximum momentum for HPO')
+    parser.add_argument('--max_patch_size', type=int, help='Maximum patch size for HPO')
+    parser.add_argument('--min_patch_size', type=int, help='Minimum patch size for HPO')
+    parser.add_argument('--max_gamma', type=float, help='Max gamma value for HPO')
+    parser.add_argument('--min_gamma', type=float, help='Min gamma value for HPO')
     parser.add_argument('--num_samples', type=int, help='Number of trials to run for HPO')
     parser.add_argument('--optimizers', type=str, nargs='+', help='Optimizers to sample from in HPO')
     parser.add_argument('--resume', action='store_true', help='Whether or not to resume an HPO trial')
@@ -71,8 +75,7 @@ if __name__ == '__main__':
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
     parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
     parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
-    parser.add_argument('--max_patch_size', type=int, help='Maximum patch size for HPO')
-    parser.add_argument('--min_patch_size', type=int, help='Minimum patch size for HPO')
+    parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
 
     args = parser.parse_args()
     defaults = {
@@ -105,6 +108,8 @@ if __name__ == '__main__':
         'max_momentum': 0.95,
         'max_patch_size': 600,
         'min_patch_size': 200,
+        'max_gamma': 0.01,
+        'min_gamma': 0.0000001,
         'num_samples': 100,
         'sampling_models': ['mask_rcnn', 'faster_rcnn', 'retina_net'],
         'optimizers': ['sgd', 'adam'],
@@ -115,6 +120,7 @@ if __name__ == '__main__':
         'run_dir': 'runinfo',
         'patch_size': 300,
         'split': [0.1, 0.2, 0.7],
+        'gamma': 0.001,
     }
     if args.config:
         if os.path.isfile(args.config):

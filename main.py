@@ -71,6 +71,8 @@ if __name__ == '__main__':
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
     parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
     parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
+    parser.add_argument('--max_patch_size', type=int, help='Maximum patch size for HPO')
+    parser.add_argument('--min_patch_size', type=int, help='Minimum patch size for HPO')
 
     args = parser.parse_args()
     defaults = {
@@ -101,6 +103,8 @@ if __name__ == '__main__':
         'max_epochs': 100,
         'min_momentum': 0.7,
         'max_momentum': 0.95,
+        'max_patch_size': 600,
+        'min_patch_size': 200,
         'num_samples': 100,
         'sampling_models': ['mask_rcnn', 'faster_rcnn', 'retina_net'],
         'optimizers': ['sgd', 'adam'],

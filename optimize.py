@@ -73,6 +73,13 @@ def pick_transforms(args: SimpleNamespace):
         return random.sample(args.transforms, nprd.randint(0, len(args.transforms) + 1))
     return f
 
+def pick_patch_size(args: SimpleNamespace):
+    if args.min_patch_size > args.max_patch_size:
+        raise ValueError('Min patch size is larger than max patch size')
+    def f(spec):
+        return nprd.randint(args.min_patch_size, args.max_patch_size + 1)
+    return f
+
 def optimize(args):
     if len(args.root) > 0 and args.root[0] != '/':
         args.root = os.path.join(os.getcwd(), args.root)
@@ -83,6 +90,7 @@ def optimize(args):
         'lr': tune.loguniform(args.min_lr, args.max_lr),
         'momentum': tune.uniform(args.min_momentum, args.max_momentum),
         'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs, args.max_epochs+1)),
+        'patch_size': tune.sample_from(pick_patch_size(args)),
         'transforms': tune.sample_from(pick_transforms(args)),
     }
     if not os.path.isdir(name_dir):

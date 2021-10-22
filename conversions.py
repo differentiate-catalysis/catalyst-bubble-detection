@@ -128,6 +128,8 @@ def gen_targets(args):
         output_dir = os.path.join(split_dir, 'targets')
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
+        if not os.path.isdir(image_root):
+            os.mkdir(image_root)
         for image_name in os.listdir(image_root):
             workers.append(convert_to_targets(image_root, json_root, output_dir, image_name))
     for worker in tqdm(workers):

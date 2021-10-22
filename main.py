@@ -155,8 +155,6 @@ if __name__ == '__main__':
     parser.add_argument('--tar', action='store_true', help='Tar output when done')
     parser.add_argument('--sampling_slices', type=int, nargs='+', help='Numbers of slices to use for models in HPO')
     parser.add_argument('--sampling_patching_modes', type=str, nargs='+', help='Patching modes to sample with in HPO')
-    parser.add_argument('--min_patch_size', type=int, help='Smallest patch size to sample in HPO')
-    parser.add_argument('--max_patch_size', type=int, help='Maximum patch size to sample in HPO')
     parser.add_argument('--min_overlap_size', type=int, help='Smallest size of overlap in HPO')
     parser.add_argument('--max_overlap_size', type=int, help='Maximum size of overlap in HPO')
     parser.add_argument('--mask', type=str, help='Mask to apply when getting metrics')
@@ -228,8 +226,6 @@ if __name__ == '__main__':
         'tar': True,
         'sampling_slices': [4, 6, 8],
         'sampling_patching_modes': ['grid'],
-        'min_patch_size': 80,
-        'max_patch_size': 852,
         'min_overlap_size': 10,
         'max_overlap_size': 30,
         'losses': ['cross_entropy'],

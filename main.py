@@ -127,6 +127,12 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs', type=int, help='Maximum number of epochs for HPO')
     parser.add_argument('--min_momentum', type=float, help='Minimum momentum for HPO')
     parser.add_argument('--max_momentum', type=float, help='Maximum momentum for HPO')
+    parser.add_argument('--max_patch_size', type=int, help='Maximum patch size for HPO')
+    parser.add_argument('--min_patch_size', type=int, help='Minimum patch size for HPO')
+    parser.add_argument('--max_batch_size', type=int, help='Maximum batch size for HPO')
+    parser.add_argument('--min_batch_size', type=int, help='Minimum batch size for HPO')
+    parser.add_argument('--max_gamma', type=float, help='Max gamma value for HPO')
+    parser.add_argument('--min_gamma', type=float, help='Min gamma value for HPO')
     parser.add_argument('--num_samples', type=int, help='Number of trials to run for HPO')
     parser.add_argument('--optimizers', type=str, nargs='+', help='Optimizers to sample from in HPO')
     parser.add_argument('--resume', action='store_true', help='Whether or not to resume an HPO trial')
@@ -139,7 +145,6 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, help='Use patience after how many epochs')
     parser.add_argument('--image_size', type=int, nargs=2, help='Size of images processed as x y (necessary for evaluate re-stitching)')
     parser.add_argument('--num_patches', type=int, nargs='+', help='Number of patches each slice is split into. Set to 0 for automatic choice based on patch and image size.')
-    parser.add_argument('--patch_size', type=int, help='Width/height of each patch.')
     parser.add_argument('--overlap_size', type=int, help='Width/height of the overlap between each patch')
     parser.add_argument('--slices', type=int, help='Number of slices to take at a time')
     parser.add_argument('--no-overlay', help='On evaluate, create full stitched images rather than overlays (if applicable)', dest='overlay', action='store_false')
@@ -160,7 +165,10 @@ if __name__ == '__main__':
     parser.add_argument('--test_set', type=str, help='Dataset to use only as test')
     parser.add_argument('--val_set', type=str, help='Dataset to use only as validation')
     parser.add_argument('--blocks', type=int, help='Number of encoding blocks to use in each architecture')
-    
+    parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
+    parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
+    parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
+
     args = parser.parse_args()
     defaults = {
         'root': 'data/bubbles',
@@ -190,6 +198,12 @@ if __name__ == '__main__':
         'max_epochs': 100,
         'min_momentum': 0.7,
         'max_momentum': 0.95,
+        'max_patch_size': 600,
+        'min_patch_size': 200,
+        'max_batch_size': 2,
+        'min_batch_size': 1,
+        'max_gamma': 0.01,
+        'min_gamma': 0.0000001,
         'num_samples': 100,
         'sampling_models': ['mask_rcnn', 'faster_rcnn', 'retina_net'],
         'optimizers': ['sgd', 'adam'],
@@ -204,7 +218,6 @@ if __name__ == '__main__':
         'patience': 0,
         'image_size': [852, 852],
         'num_patches': [3],
-        'patch_size': None,
         'overlap_size': None,
         'slices': 8,
         'overlay': True,
@@ -224,7 +237,10 @@ if __name__ == '__main__':
         'train_set': None,
         'test_set': None,
         'val_set': None,
-        'blocks': 2
+        'blocks': 2,
+        'patch_size': 300,
+        'split': [0.1, 0.2, 0.7],
+        'gamma': 0.001,
     }
     if args.config:
         if os.path.isfile(args.config):

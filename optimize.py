@@ -73,6 +73,21 @@ def pick_transforms(args: SimpleNamespace):
         return random.sample(args.transforms, nprd.randint(0, len(args.transforms) + 1))
     return f
 
+def pick_batch_size(args: SimpleNamespace):
+    def f(spec):
+        max_exp = int(math.log(args.max_batch_size, 2))
+        min_exp = int(math.log(args.min_batch_size, 2))
+        exp = nprd.randint(min_exp, max_exp + 1)
+        return 2 ** exp
+    return f
+
+def pick_patch_size(args: SimpleNamespace):
+    if args.min_patch_size > args.max_patch_size:
+        raise ValueError('Min patch size is larger than max patch size')
+    def f(spec):
+        return nprd.randint(args.min_patch_size, args.max_patch_size + 1)
+    return f
+
 def optimize(args):
     if len(args.root) > 0 and args.root[0] != '/':
         args.root = os.path.join(os.getcwd(), args.root)
@@ -83,7 +98,10 @@ def optimize(args):
         'lr': tune.loguniform(args.min_lr, args.max_lr),
         'momentum': tune.uniform(args.min_momentum, args.max_momentum),
         'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs, args.max_epochs+1)),
+        'patch_size': tune.sample_from(pick_patch_size(args)),
+        'batch_size': tune.sample_from(pick_batch_size(args)),
         'transforms': tune.sample_from(pick_transforms(args)),
+        'gamma': tune.loguniform(args.min_gamma, args.max_gamma),
     }
     if not os.path.isdir(name_dir):
         os.mkdir(name_dir)
@@ -129,7 +147,7 @@ def optimize(args):
         print('Best trial final validation iou: {}'.format(
             best_trial.last_result['iou']))
         print('Best Checkpoint Dir: ' + str(best_trial.checkpoint.value))
-        checkpoint = [file for file in os.listdir(best_trial.checkpoint.value) if 'pth' in file and args.name in file]
+        checkpoint = [file for file in os.listdir(best_trial.checkpoint.value) if 'best.pth' in file]
         if len(checkpoint) > 0:
             checkpoint = checkpoint[0]
         else:
@@ -144,15 +162,13 @@ def optimize(args):
                 }, os.path.join(name_dir, 'best.pth')
         )
         config_out = best_trial.config.copy()
-        config_out['num_patches'] = [-(args.image_size[0] // -config_out['patch_size']), -(args.image_size[1] // -config_out['patch_size'])]
-        config_out['root'] = 'data/HandSeg_Reserved'
+        config_out['root'] = args.root#'data/HandSeg_Reserved'
         config_out['mp'] = args.mp
         config_out['gpu'] = args.gpu
         config_out['amp'] = args.amp
+        config_out['patch'] = args.patch_size
         config_out['name'] = '%s_optimized' % args.name
         config_out['version'] = 0
         config_out['test_dir'] = 'test'
-        config_out['image_size'] = args.image_size
-        config_out['blocks'] = args.blocks
         with open(os.path.join(name_dir, 'best.json'), 'w') as f:
             json.dump(config_out, f, indent=4)

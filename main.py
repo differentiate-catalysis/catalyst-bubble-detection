@@ -64,6 +64,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_momentum', type=float, help='Maximum momentum for HPO')
     parser.add_argument('--max_patch_size', type=int, help='Maximum patch size for HPO')
     parser.add_argument('--min_patch_size', type=int, help='Minimum patch size for HPO')
+    parser.add_argument('--max_batch_size', type=int, help='Maximum batch size for HPO')
+    parser.add_argument('--min_batch_size', type=int, help='Minimum batch size for HPO')
     parser.add_argument('--max_gamma', type=float, help='Max gamma value for HPO')
     parser.add_argument('--min_gamma', type=float, help='Min gamma value for HPO')
     parser.add_argument('--num_samples', type=int, help='Number of trials to run for HPO')
@@ -108,6 +110,8 @@ if __name__ == '__main__':
         'max_momentum': 0.95,
         'max_patch_size': 600,
         'min_patch_size': 200,
+        'max_batch_size': 2,
+        'min_batch_size': 1,
         'max_gamma': 0.01,
         'min_gamma': 0.0000001,
         'num_samples': 100,

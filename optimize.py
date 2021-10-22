@@ -73,6 +73,14 @@ def pick_transforms(args: SimpleNamespace):
         return random.sample(args.transforms, nprd.randint(0, len(args.transforms) + 1))
     return f
 
+def pick_batch_size(args: SimpleNamespace):
+    def f(spec):
+        max_exp = int(math.log(args.max_batch_size, 2))
+        min_exp = int(math.log(args.min_batch_size, 2))
+        exp = nprd.randint(min_exp, max_exp + 1)
+        return 2 ** exp
+    return f
+
 def pick_patch_size(args: SimpleNamespace):
     if args.min_patch_size > args.max_patch_size:
         raise ValueError('Min patch size is larger than max patch size')
@@ -91,6 +99,7 @@ def optimize(args):
         'momentum': tune.uniform(args.min_momentum, args.max_momentum),
         'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs, args.max_epochs+1)),
         'patch_size': tune.sample_from(pick_patch_size(args)),
+        'batch_size': tune.sample_from(pick_batch_size(args)),
         'transforms': tune.sample_from(pick_transforms(args)),
         'gamma': tune.loguniform(args.min_gamma, args.max_gamma),
     }

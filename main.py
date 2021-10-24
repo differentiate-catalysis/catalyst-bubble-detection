@@ -11,6 +11,7 @@ from optimize import optimize
 from utils import gen_args
 from conversions import gen_label_images, gen_targets
 from models import model_mappings as rcnn_models
+from evaluate import run_apply
 
 from MatCNN.image2npy import convert_dir
 from MatCNN.evaluate import run_stitch
@@ -52,8 +53,7 @@ def main(args: SimpleNamespace):
             train_model(args.gpu, args)
             valid_mode = True
         if 'apply' in modes:
-            #TODO: Add apply functionality
-            #run_apply(args)
+            run_apply(args)
             valid_mode = True
         if 'metrics' in modes:
             #TODO: Add metrics functionality

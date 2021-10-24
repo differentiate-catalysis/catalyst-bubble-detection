@@ -1,6 +1,7 @@
 import math
 import sys
 from typing import List, Tuple
+import os
 from utils import get_iou_types
 
 import torch
@@ -16,8 +17,10 @@ from tqdm import tqdm
 from coco_eval import CocoEvaluator
 from coco_utils import get_coco_api_from_dataset
 
+from models import model_mappings
+from utils import Dataset, collate_fn
 
-def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tuple[float, float, float]:
+def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: str = None) -> Tuple[float, float, float]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -51,6 +54,8 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int) -> Tu
                     boxes.append(nms_boxes)
                     target_boxes.append(target['boxes'])
                     scores.append(nms_scores)
+
+                    #TODO: Add export of boxes and masks
 
                     # if 'masks' in output:
                         # masks = output['masks']
@@ -173,3 +178,36 @@ def get_metrics(boxes: List[Tensor], scores: List[Tensor], targets: List[Tensor]
     average_precisions = precisions.mean()
     mean_iou = iou.mean()
     return average_precisions, mean_iou
+
+def run_apply(args):
+    test_dir = os.path.join(args.root, args.name, args.test_dir)
+    if not (os.path.isdir(os.path.join(test_dir, 'patches')) and os.path.isdir(os.path.join(test_dir, 'targets'))):
+        print("Skipping apply, no test data")
+        return
+    torch.manual_seed(0)
+
+    if args.mp and args.gpu > -1:
+        gpu = args.gpu - 1
+    else:
+        gpu = args.gpu
+    if torch.cuda.is_available() and gpu > -1:
+        device = torch.device('cuda', gpu)
+        model = model_mappings[args.model]
+        model.to(device)
+    else:
+        model = model_mappings[args.model]
+    test_set = Dataset(test_dir, [], False)
+    test_loader = DataLoader(test_set, batch_size=1, num_workers=0, drop_last=False, collate_fn=collate_fn)
+
+    model_dir = 'saved/%s.pth' % (args.name)#, args.version)
+    model.load_state_dict(torch.load(model_dir)['model_state_dict'])
+
+    save_dir = '%s/predictions/%s' % (test_dir, args.name)
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+    
+    loss, iou, mAP = evaluate(model, test_loader, args.amp, gpu, save_dir)
+    return loss, iou, mAP
+    
+def run_metrics(args):
+    pass

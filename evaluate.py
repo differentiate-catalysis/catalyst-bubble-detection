@@ -221,7 +221,7 @@ def label_on_image(image_file, boxes):
         if np.size(boxes[i]) == 0:
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
-        y1, x1, y2, x2 = boxes[i]   # corners of bounding box. The accuracy of this algorithm could be greatly improved by  interpreting the masks directly as opposed to using the bounding box
+        x1, y1, x2, y2 = boxes[i]   # corners of bounding box. The accuracy of this algorithm could be greatly improved by  interpreting the masks directly as opposed to using the bounding box
 
         D = int((x2+y2-x1-y1)/2)    # width of bounding box == diameter of bubble
         center_x = int((x2+x1)/2)

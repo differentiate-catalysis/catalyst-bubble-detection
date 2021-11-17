@@ -6,6 +6,7 @@ from transforms import target_from_masks
 import skimage.draw
 import shutil
 import numpy as np
+import cv2 as cv
 import math
 import parsl
 from parsl import python_app
@@ -192,3 +193,29 @@ def gen_targets(args):
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()
+
+def label_to_bubble_json(label_file, json_file: str=None):
+    img = cv.imread(label_file,0)
+    img = cv.GaussianBlur(img, (3,3), cv.BORDER_DEFAULT)
+    cimg = cv.cvtColor(img,cv.COLOR_GRAY2BGR)
+    circles = cv.HoughCircles(img,cv.HOUGH_GRADIENT,1,20,
+                                param1=60,param2=22,minRadius=0,maxRadius=0)
+    circles = np.uint16(np.around(circles))
+
+    outdir = {}
+    outdir['width'] = img.shape[0]
+    outdir['height'] = img.shape[1]
+    outdir['filename'] = os.path.basename(label_file)
+    outdir['bubbles'] = []
+    for circle in circles[0]:
+        bubble_data = {
+            "center": [circle[0].item(), circle[1].item()],
+            "radius": circle[2].item()
+        }
+        outdir['bubbles'].append(bubble_data)
+    if json_file:
+        with open(json_file, 'w') as outfp:
+            json.dump(outdir, outfp, indent=2)
+    return outdir
+ 
+    

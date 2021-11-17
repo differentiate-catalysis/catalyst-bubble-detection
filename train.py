@@ -94,12 +94,12 @@ def train_model(gpu: int, args: SimpleNamespace):
                 last_loss_eval = checkpoint['loss_val']
                 epoch_init = checkpoint['epoch'] + 1
                 iou_max = checkpoint['iou_val_max']
-                print('Successfuly loaded checkpoint, continuing from epoch %d of %d...' % (epoch_init, args.epochs))
+                print('Successfuly loaded checkpoint, continuing from epoch %d of %d...' % (epoch_init, args.epoch))
             except:
                 print('Failed to load checkpoint. Training from scratch...')
         else:
             print('Did not load checkpoint. Training from scratch...')
-    for epoch in range(epoch_init, args.epochs + 1):
+    for epoch in range(epoch_init, args.epoch + 1):
         # Train for one epoch
         loss_train = train_epoch(model, optimizer, train_loader, epoch, amp=amp, gpu=gpu)
         lr_scheduler.step()

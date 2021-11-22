@@ -58,15 +58,22 @@ class Dataset(torch.utils.data.Dataset):
         # img.save('/home/jim/masks/%s.png' % image_id)
 
         # Fill target according to COCO standard
-        target['boxes'] = boxes
-        target['area'] = areas
-        target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
-        target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
-        target['masks'] = mask
-        target['image_id'] = torch.tensor([index])
-        # Augment the image and target
+
         transform = get_transforms(self.training, self.transforms)
-        image, target = transform(image, target)
+
+        if not (torch.any(mask) or torch.any(boxes) or torch.any(areas)): #Account for 0 targets (i.e. unlabeled image evaluated)
+            target = None
+            image, _ = transform(image)
+        else:
+            target['boxes'] = boxes
+            target['area'] = areas
+            target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
+            target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
+            target['masks'] = mask
+            target['image_id'] = torch.tensor([index])
+            # Augment the image and target
+            
+            image, target = transform(image, target)
         return image, target
 
     def __len__(self):

@@ -11,7 +11,7 @@ from optimize import optimize
 from utils import gen_args
 from conversions import gen_label_images, gen_targets
 from models import model_mappings as rcnn_models
-from evaluate import run_apply
+from evaluate import run_apply, run_metrics
 
 from MatCNN.image2npy import convert_dir
 from MatCNN.evaluate import run_stitch
@@ -52,12 +52,14 @@ def main(args: SimpleNamespace):
                 mp.spawn(train_model, nprocs=args.gpu, args=(args,))
             train_model(args.gpu, args)
             valid_mode = True
+        if 'evaluate' in modes:
+            loss = run_apply(args)
+            run_metrics(args, loss=loss)
         if 'apply' in modes:
             run_apply(args)
             valid_mode = True
         if 'metrics' in modes:
-            #TODO: Add metrics functionality
-            #run_metrics(args)
+            run_metrics(args)
             valid_mode = True
         if 'optimize' in args.mode:
             optimize(args)
@@ -69,6 +71,10 @@ def main(args: SimpleNamespace):
             else:
                 mat_train(args.gpu, args)
             valid_mode = True
+        if 'evaluate' in modes:
+            loss = run_apply(args)
+            run_stitch(args)
+            run_metrics(args, loss=loss)
         if 'apply' in modes:
             mat_run_apply(args)
             valid_mode = True
@@ -76,7 +82,6 @@ def main(args: SimpleNamespace):
             run_stitch(args)
             valid_mode = True
         if 'metrics' in modes:
-            #TODO: Add metrics functionality
             mat_run_metrics(args)
             valid_mode = True
         if 'optimize' in args.mode:

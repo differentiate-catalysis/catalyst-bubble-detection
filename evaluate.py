@@ -23,7 +23,7 @@ from coco_utils import get_coco_api_from_dataset
 from models import model_mappings
 from utils import Dataset, collate_fn
 
-def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: str = None, test: bool = False) -> Tuple[float, float, float]:
+def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: str = None, test: bool = False, apply: bool = True, metrics: bool = True) -> Tuple[float, float, float]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -37,29 +37,70 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         boxes = []
         target_boxes = []
         scores = []
-        coco = get_coco_api_from_dataset(valid_loader.dataset)
-        iou_types = get_iou_types(model)
-        coco_evaluator = CocoEvaluator(coco, iou_types)
+        _, has_target = next(iter((valid_loader)))
+        if has_target[0] is not None:
+            coco = get_coco_api_from_dataset(valid_loader.dataset)
+            iou_types = get_iou_types(model)
+            coco_evaluator = CocoEvaluator(coco, iou_types)
         for j, (images, targets) in enumerate(tqdm(valid_loader)):
             images = list(image.to(device) for image in images)
-            targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
+            has_target = targets[0] is not None
+            if has_target:
+                targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
             with torch.cuda.amp.autocast(enabled=amp):
                 outputs = model(images)
                 outputs_cpu = [{k: v.to('cpu') for k, v in t.items()} for t in outputs]
-                res = {target["image_id"].item(): output for target, output in zip(targets, outputs_cpu)}
-                coco_evaluator.update(res)
+                if has_target:
+                    res = {target["image_id"].item(): output for target, output in zip(targets, outputs_cpu)}
+                    coco_evaluator.update(res)
                 # print(outputs.shape)
-                for i in range(len(targets)):
-                    output = outputs[i]
-                    target = targets[i]
-                    # NMS the boxes
-                    nms_boxes, nms_scores = nms(output['boxes'], output['scores'], 0.5)
-                    boxes.append(nms_boxes)
-                    target_boxes.append(target['boxes'])
-                    scores.append(nms_scores)
+                    for i in range(len(targets)):
+                        output = outputs[i]
+                        if targets:
+                            target = targets[i]
+                            target_boxes.append(target['boxes'])
+                        # NMS the boxes
+                        nms_boxes, nms_scores = nms(output['boxes'], output['scores'], 0.5)
+                        boxes.append(nms_boxes)
+                        scores.append(nms_scores)
 
-                    #TODO: Add export of boxes and masks
-                    if test:
+                        if test:
+                            this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
+                            if 'boxes' in output:
+                                box_cpu = output['boxes'].cpu()
+                                np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
+                            if 'masks' in output:
+                                mask_cpu = output['masks'].cpu()
+                                np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)
+                            #if scores:
+                                #np.save(os.path.join(save_dir, 'scores', this_image), scores)
+                            '''    
+                            labeled = label_on_image(os.path.join(valid_loader.dataset.patch_root, this_image), nms_boxes)
+                            label_image = to_pil_image(labeled)
+                            label_image.save(os.path.join(save_dir, 'labeled_images', this_image))
+                            '''
+                        
+
+                        # if 'masks' in output:
+                            # masks = output['masks']
+                            # masks = torch.sum(masks, dim=0).byte()
+                            # masks[masks >= 1] = 255
+                            # img = to_pil_image(masks).convert('L')
+                            # img.save('/home/jim/outmasks/%d.png' % (j * valid_loader.batch_size + i))
+                        # print(outputs)
+                        # iou = torchvision.ops.box_iou(output['boxes'], target['boxes'])
+                        # dims = iou.shape
+                        # matrix = torch.zeros((max(dims[0], dims[1]), max(dims[0], dims[1])))
+                        # matrix[:dims[0], :dims[1]] = iou
+                        # total_iou += torch.sum(torch.diagonal(matrix)).item()
+                    # Must set model to train mode to get loss
+                    model.train()
+                    loss_dict = model(images, targets)
+                    loss = sum(loss for loss in loss_dict.values()).item()
+                    model.eval()
+                elif test:
+                    for i in range(len(outputs)):
+                        output = outputs[i]
                         this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
                         if 'boxes' in output:
                             box_cpu = output['boxes'].cpu()
@@ -67,45 +108,30 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         if 'masks' in output:
                             mask_cpu = output['masks'].cpu()
                             np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)
+                        if scores:
+                            np.save(os.path.join(save_dir, 'scores', this_image), scores)
 
-                        labeled = label_on_image(os.path.join(valid_loader.dataset.patch_root, this_image), output['boxes'])
-                        label_image = to_pil_image(labeled)
-                        label_image.save(os.path.join(save_dir, 'labeled_images', this_image))
-                    
-
-                    # if 'masks' in output:
-                        # masks = output['masks']
-                        # masks = torch.sum(masks, dim=0).byte()
-                        # masks[masks >= 1] = 255
-                        # img = to_pil_image(masks).convert('L')
-                        # img.save('/home/jim/outmasks/%d.png' % (j * valid_loader.batch_size + i))
-                    # print(outputs)
-                    # iou = torchvision.ops.box_iou(output['boxes'], target['boxes'])
-                    # dims = iou.shape
-                    # matrix = torch.zeros((max(dims[0], dims[1]), max(dims[0], dims[1])))
-                    # matrix[:dims[0], :dims[1]] = iou
-                    # total_iou += torch.sum(torch.diagonal(matrix)).item()
-                # Must set model to train mode to get loss
-                model.train()
-                loss_dict = model(images, targets)
-                loss = sum(loss for loss in loss_dict.values()).item()
-                model.eval()
-            if not math.isfinite(loss) and not test:
-                print('Loss is %s, stopping training' % loss)
-                if tune.is_session_enabled():
-                    tune.report(loss=10000, iou=0, map=0)
-                return 10000, 0, 0
-            total_loss += loss * valid_loader.batch_size
-        coco_evaluator.synchronize_between_processes()
-        coco_evaluator.accumulate()
-        stats = coco_evaluator.summarize()
+                if has_target:
+                    if not math.isfinite(loss) and not test:
+                        print('Loss is %s, stopping training' % loss)
+                        if tune.is_session_enabled():
+                            tune.report(loss=10000, iou=0, map=0)
+                        return 10000, 0, 0
+                    total_loss += loss * valid_loader.batch_size
+        if has_target:
+            coco_evaluator.synchronize_between_processes()
+            coco_evaluator.accumulate()
+            stats = coco_evaluator.summarize()
         # print(stats)
-        mAP, iou = get_metrics(boxes, scores, target_boxes, device, 0.5)
-        mAP = stats[0][0]
-        print('--- evaluation result ---')
-        print('loss: %.5f, mAP %.5f, IoU %.5f' % (total_loss / num_samples, mAP, iou))
+        if not test:
+            mAP, iou = get_metrics(boxes, scores, target_boxes, device, 0.5)
+            mAP = stats[0][0]
+            print('--- evaluation result ---')
+            print('loss: %.5f, mAP %.5f, IoU %.5f' % (total_loss / num_samples, mAP, iou))
 
-    return total_loss / num_samples, iou, mAP
+            return total_loss / num_samples, iou, mAP
+        else:
+            return total_loss / num_samples
 
 def nms(boxes: torch.Tensor, scores: torch.Tensor, iou_threshold: float = 0.5) -> Tuple[torch.Tensor, torch.Tensor]:
     scores, indices = torch.sort(scores, dim=0, descending=True)
@@ -355,13 +381,39 @@ def run_apply(args):
     model.load_state_dict(torch.load(model_dir)['model_state_dict'])
 
     save_dir = '%s/predictions/%s' % (test_dir, args.name)
+    needed_subdirs = ['boxes', 'masks', 'labeled_images', 'scores']
     if not os.path.isdir(save_dir):
-        os.makedirs(os.path.join(save_dir, 'boxes'))
-        os.makedirs(os.path.join(save_dir, 'masks'))
-        os.makedirs(os.path.join(save_dir, 'labeled_images'))
+        os.makedirs(save_dir)
+    for subdir in needed_subdirs:
+        if not os.path.isdir(os.path.join(save_dir, subdir)):
+            os.makedirs(os.path.join(save_dir, subdir))
     
-    loss, iou, mAP = evaluate(model, test_loader, args.amp, gpu, save_dir = save_dir, test=True)
-    return loss, iou, mAP
+    loss = evaluate(model, test_loader, args.amp, gpu, save_dir = save_dir, test=True)
+    return loss
     
-def run_metrics(args):
-    pass
+def run_metrics(args, loss=None):
+    if args.mp and args.gpu > -1:
+        gpu = args.gpu - 1
+    else:
+        gpu = args.gpu
+    if gpu != -1:
+        device = torch.device('cuda', gpu)
+    else:
+        device = torch.device('cpu')
+    test_dir = os.path.join(args.root, args.name, args.test_dir)
+    save_dir = '%s/predictions/%s' % (test_dir, args.name)
+    boxes = [torch.Tensor(np.load(os.path.join(save_dir, 'boxes', file)), device=device) for file in os.listdir(os.path.join(save_dir, 'boxes'))]
+    scores = [torch.Tensor(np.load(os.path.join(save_dir, 'scores', file)), device=device) for file in os.listdir(os.path.join(save_dir, 'scores'))]
+    target_box_files = []
+    for file in os.listdir(os.path.join(test_dir, 'targets')):
+        if 'boxes' in file:
+            target_box_files.append(file)
+    target_boxes = [torch.Tensor(np.load(os.path.join(test_dir, 'targets', file))) for file in target_box_files]
+
+    mAP, iou = get_metrics(boxes, scores, target_boxes, device, 0.5)
+    
+    #mAP = stats[0][0]
+    print('--- evaluation result ---')
+    print('loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou))
+
+    return  loss, iou, mAP

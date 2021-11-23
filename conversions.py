@@ -99,40 +99,50 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
 
     # Prepare for patching
     image = np.asarray(image)
-    n_patches_w = math.ceil(width / patch_size)
-    overlap_w = n_patches_w * patch_size - width
-    n_overlaps_w = n_patches_w - 1
-    # Concept: Be on the lookout for magic camels.
-    overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w)) // n_overlaps_w
-    dec_indices = np.random.default_rng().choice(n_overlaps_w, size=((-overlap_w % n_overlaps_w)), replace=False) + 1
-    overlaps_w[dec_indices] -= 1
-    overlaps_w[0] = 0
-    overlaps_w = np.cumsum(overlaps_w)
+    if patch_size == -1:
+        n_patches_w = 1
+        n_patches_h = 1
+    else:
+        n_patches_w = math.ceil(width / patch_size)
+        overlap_w = n_patches_w * patch_size - width
+        n_overlaps_w = n_patches_w - 1
+        # Concept: Be on the lookout for magic camels.
+        overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w)) // n_overlaps_w
+        dec_indices = np.random.default_rng().choice(n_overlaps_w, size=((-overlap_w % n_overlaps_w)), replace=False) + 1
+        overlaps_w[dec_indices] -= 1
+        overlaps_w[0] = 0
+        overlaps_w = np.cumsum(overlaps_w)
 
-    n_patches_h = math.ceil(height / patch_size)
-    overlap_h = n_patches_h * patch_size - height
-    n_overlaps_h = n_patches_h - 1
-    overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h)) // n_overlaps_h
-    dec_indices = np.random.default_rng().choice(n_overlaps_h, size=((-overlap_h % n_overlaps_h)), replace=False) + 1
-    overlaps_h[dec_indices] -= 1
-    overlaps_h[0] = 0
-    overlaps_h = np.cumsum(overlaps_h)
+        n_patches_h = math.ceil(height / patch_size)
+        overlap_h = n_patches_h * patch_size - height
+        n_overlaps_h = n_patches_h - 1
+        overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h)) // n_overlaps_h
+        dec_indices = np.random.default_rng().choice(n_overlaps_h, size=((-overlap_h % n_overlaps_h)), replace=False) + 1
+        overlaps_h[dec_indices] -= 1
+        overlaps_h[0] = 0
+        overlaps_h = np.cumsum(overlaps_h)
 
     for i in range(n_patches_w):
         for j in range(n_patches_h):
-            patch = image[patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i], :]
+            # Disable patching
+            if patch_size == -1:
+                patch = image
+                if has_label:
+                    masks = mask
+            else:
+                patch = image[patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i], :]
+                if has_label:
+                    masks = mask[:, patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i]]
 
             if has_label:
-                masks = mask[:, patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i]]
-
                 target = target_from_masks(torch.from_numpy(masks))
                 masks = target['masks'].numpy()
                 boxes = target['boxes'].numpy()
                 areas = target['areas'].numpy()
-            
+
             image_out = Image.fromarray(patch, mode='RGB')
 
-            
+
             if not has_label:
                 target_output_dir = os.path.join(trial_dir, 'test', 'targets') # Must be test if no label
                 image_output_dir = os.path.join(trial_dir, 'test', 'patches')

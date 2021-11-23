@@ -168,7 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_set', type=str, help='Dataset to use only as test')
     parser.add_argument('--val_set', type=str, help='Dataset to use only as validation')
     parser.add_argument('--blocks', type=int, help='Number of encoding blocks to use in each architecture')
-    parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
+    parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation. Set to -1 to disable patching')
     parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
     parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
 

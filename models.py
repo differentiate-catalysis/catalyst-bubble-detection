@@ -31,7 +31,10 @@ def retina_net(image_mean: List[float], image_std: List[float]) -> RetinaNet:
 
 def model_mappings(args: SimpleNamespace):
     if not args.imagenet_stats:
-        stats = os.path.join(args.root, args.name, 'stats.json')
+        if args.stats_file:
+            stats = args.stats_file
+        else:
+            stats = os.path.join(args.root, args.name, 'stats.json')
         with open(stats) as f:
             stats = json.load(f)
             mean = stats['mean']

@@ -172,6 +172,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
     parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
     parser.add_argument('--imagenet_stats', action='store_true', help='Use ImageNet stats instead of dataset stats for normalization')
+    parser.add_argument('--stats_file', type=str, help='JSON file to read stats from')
 
     args = parser.parse_args()
     defaults = {
@@ -244,6 +245,7 @@ if __name__ == '__main__':
         'split': [0.1, 0.2, 0.7],
         'gamma': 0.001,
         'imagenet_stats': False,
+        'stats_file': None,
     }
     if args.config:
         if os.path.isfile(args.config):

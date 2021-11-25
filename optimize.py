@@ -17,7 +17,7 @@ import math
 from ray.tune.integration.torch import DistributedTrainableCreator, distributed_checkpoint_dir
 import json
 
-from models import model_mappings
+from models import model_mappings, model_keys
 from transforms import transform_mappings
 from conversions import gen_targets
 
@@ -46,18 +46,18 @@ def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None,
     train_model(0, args)
 
 def pick_model(args: SimpleNamespace):
-    if not set(args.sampling_models).issubset(set(model_mappings.keys())):
+    if not set(args.sampling_models).issubset(set(model_keys)):
         raise ValueError('Sampling models contain invalid values')
     def f(spec):
         model = random.choice(args.sampling_models)
         return model.lower()
     return f
 
-def pick_batch_size(args: SimpleNamespace):
-    def f(spec):
-        batch_size = 2 ** nprd.randint(0, int(math.log2(args.batch_size) + 1))
-        return batch_size
-    return f
+# def pick_batch_size(args: SimpleNamespace):
+    # def f(spec):
+        # batch_size = 2 ** nprd.randint(0, int(math.log2(args.batch_size) + 1))
+        # return batch_size
+    # return f
 
 def pick_optimizer(args: SimpleNamespace):
     if not set(args.optimizers).issubset(set(['adam', 'adamw', 'sgd'])):

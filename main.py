@@ -10,7 +10,7 @@ from train import train_model
 from optimize import optimize
 from utils import gen_args
 from conversions import gen_label_images, gen_targets
-from models import model_mappings as rcnn_models
+from models import model_keys as rcnn_models
 from evaluate import run_apply, run_metrics
 
 from MatCNN.image2npy import convert_dir
@@ -46,7 +46,7 @@ def main(args: SimpleNamespace):
     if 'gen_targets' in args.mode:
         gen_targets(args)
         valid_mode = True
-    if args.model in rcnn_models.keys():
+    if args.model in rcnn_models:
         if 'train' in args.mode:
             if args.gpu and args.mp:
                 mp.spawn(train_model, nprocs=args.gpu, args=(args,))
@@ -171,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation. Set to -1 to disable patching')
     parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
     parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
+    parser.add_argument('--imagenet_stats', action='store_true', help='Use ImageNet stats instead of dataset stats for normalization')
 
     args = parser.parse_args()
     defaults = {
@@ -219,7 +220,7 @@ if __name__ == '__main__':
         'aug': False,
         'version': None,
         'patience': 0,
-        'image_size': [852, 852],
+        'image_size': [1920, 1080],
         'num_patches': [3],
         'overlap_size': None,
         'slices': 8,
@@ -242,6 +243,7 @@ if __name__ == '__main__':
         'patch_size': 300,
         'split': [0.1, 0.2, 0.7],
         'gamma': 0.001,
+        'imagenet_stats': False,
     }
     if args.config:
         if os.path.isfile(args.config):

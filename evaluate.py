@@ -74,11 +74,9 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                                 np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)
                             #if scores:
                                 #np.save(os.path.join(save_dir, 'scores', this_image), scores)
-                            '''    
                             labeled = label_on_image(os.path.join(valid_loader.dataset.patch_root, this_image), nms_boxes)
                             label_image = to_pil_image(labeled)
                             label_image.save(os.path.join(save_dir, 'labeled_images', this_image))
-                            '''
                         
 
                         # if 'masks' in output:
@@ -370,10 +368,10 @@ def run_apply(args):
         gpu = args.gpu
     if torch.cuda.is_available() and gpu > -1:
         device = torch.device('cuda', gpu)
-        model = model_mappings[args.model]
+        model = model_mappings(args)
         model.to(device)
     else:
-        model = model_mappings[args.model]
+        model = model_mappings(args)
     test_set = Dataset(test_dir, [], False)
     test_loader = DataLoader(test_set, batch_size=1, num_workers=0, drop_last=False, collate_fn=collate_fn)
 
@@ -387,10 +385,10 @@ def run_apply(args):
     for subdir in needed_subdirs:
         if not os.path.isdir(os.path.join(save_dir, subdir)):
             os.makedirs(os.path.join(save_dir, subdir))
-    
+
     loss = evaluate(model, test_loader, args.amp, gpu, save_dir = save_dir, test=True)
     return loss
-    
+
 def run_metrics(args, loss=None):
     if args.mp and args.gpu > -1:
         gpu = args.gpu - 1
@@ -402,16 +400,16 @@ def run_metrics(args, loss=None):
         device = torch.device('cpu')
     test_dir = os.path.join(args.root, args.name, args.test_dir)
     save_dir = '%s/predictions/%s' % (test_dir, args.name)
-    boxes = [torch.Tensor(np.load(os.path.join(save_dir, 'boxes', file)), device=device) for file in os.listdir(os.path.join(save_dir, 'boxes'))]
-    scores = [torch.Tensor(np.load(os.path.join(save_dir, 'scores', file)), device=device) for file in os.listdir(os.path.join(save_dir, 'scores'))]
+    boxes = [torch.tensor(np.load(os.path.join(save_dir, 'boxes', file)), device=device) for file in os.listdir(os.path.join(save_dir, 'boxes'))]
+    scores = [torch.tensor(np.load(os.path.join(save_dir, 'scores', file)), device=device) for file in os.listdir(os.path.join(save_dir, 'scores'))]
     target_box_files = []
     for file in os.listdir(os.path.join(test_dir, 'targets')):
         if 'boxes' in file:
             target_box_files.append(file)
-    target_boxes = [torch.Tensor(np.load(os.path.join(test_dir, 'targets', file))) for file in target_box_files]
+    target_boxes = [torch.tensor(np.load(os.path.join(test_dir, 'targets', file))) for file in target_box_files]
 
-    mAP, iou = get_metrics(boxes, scores, target_boxes, device, 0.5)
-    
+    mAP, iou = 0, 0#get_metrics(boxes, scores, target_boxes, device, 0.5)
+
     #mAP = stats[0][0]
     print('--- evaluation result ---')
     print('loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou))

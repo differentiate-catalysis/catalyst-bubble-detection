@@ -41,7 +41,7 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
                 _, height = F._get_image_size(image)
                 target['boxes'][:, [1, 3]] = height - target['boxes'][:, [3, 1]]
                 if 'masks' in target:
-                    target['masks'] = target['masks'].flip(-1)
+                    target['masks'] = target['masks'].flip(-2)
         return image, target
 
 def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transform: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:

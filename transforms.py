@@ -134,7 +134,7 @@ class RandomRotation(T.RandomRotation):
                 for key, value in corrected_target.items():
                     target[key] = value
             else:
-                matrix = torch.tensor([[math.cos(rad), -math.sin(rad)], [math.sin(rad), math.cos(rad)]], dtype=torch.float32)
+                matrix = torch.tensor([[math.cos(rad), math.sin(rad)], [-math.sin(rad), math.cos(rad)]], dtype=torch.float32)
                 target['areas'], target['boxes'] = transform_boxes(image, target, matrix)
         return image, target
 

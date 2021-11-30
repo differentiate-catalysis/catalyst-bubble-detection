@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import skimage.draw
 import torch
 import torch.utils.data
 import torchvision
@@ -57,7 +56,6 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
                 composition.append(transform_mappings[transform])
             else:
                 raise ValueError('Invalid transform %s supplied' % transform)
-    # composition.append(Normalize(mean, std))
     return Compose(composition)
 
 class Dataset(torch.utils.data.Dataset):

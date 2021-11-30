@@ -79,7 +79,7 @@ def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transf
     total_tensor = nonnegative_height_tensor * nonnegative_vals_tensor * nonnegative_width_tensor
     proper_instances = torch.where(total_tensor == 1)
     out_boxes = out_boxes[proper_instances]
-    areas = (out_boxes[:, 2] - out_boxes[:, 0]) * (out_boxes[:, 1] - out_boxes[:, 3])
+    areas = (out_boxes[:, 2] - out_boxes[:, 0]) * (out_boxes[:, 3] - out_boxes[:, 1])
     return areas, out_boxes
 
 def target_from_masks(masks: torch.Tensor) -> Dict[str, torch.Tensor]:

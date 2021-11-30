@@ -48,7 +48,7 @@ def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) ->
 
     return means, std
 
-def get_transforms(training: bool, transforms: List[str], mean: Tuple[float], std: Tuple[float]) -> Compose:
+def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
     if training and transforms:
@@ -70,11 +70,7 @@ class Dataset(torch.utils.data.Dataset):
         self.image_ids = os.listdir(self.patch_root)
         self.training = training
         self.stats = os.path.join(root, '..', 'stats.json')
-        with open(self.stats) as f:
-            stats = json.load(f)
-            self.mean = stats['mean']
-            self.std = stats['std']
-        self.transform = get_transforms(self.training, transforms, self.mean, self.std)
+        self.transform = get_transforms(self.training, transforms)
         # if num_images == -1:
             # self.num_images = len(os.listdir(self.image_root))
         # else:

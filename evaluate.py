@@ -60,7 +60,10 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                             target = targets[i]
                             target_boxes.append(target['boxes'])
                         # NMS the boxes
-                        nms_boxes, nms_scores = nms(output['boxes'], output['scores'], 0.5)
+                        # nms_boxes, nms_scores = nms(output['boxes'], output['scores'], 0.3)
+                        indices = torchvision.ops.nms(output['boxes'], output['scores'], 0.3)
+                        nms_boxes = output['boxes'][indices]
+                        nms_scores = output['scores'][indices]
                         boxes.append(nms_boxes)
                         scores.append(nms_scores)
 
@@ -101,8 +104,13 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         output = outputs[i]
                         this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
                         if 'boxes' in output:
+                            indices = torchvision.ops.nms(output['boxes'], output['scores'], 0.3)
+                            nms_boxes = output['boxes'][indices]
                             box_cpu = output['boxes'].cpu()
                             np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
+                            labeled = label_on_image(os.path.join(valid_loader.dataset.patch_root, this_image), nms_boxes)
+                            label_image = to_pil_image(labeled)
+                            label_image.save(os.path.join(save_dir, 'labeled_images', this_image))
                         if 'masks' in output:
                             mask_cpu = output['masks'].cpu()
                             np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)

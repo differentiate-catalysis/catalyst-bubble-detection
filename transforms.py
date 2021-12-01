@@ -41,7 +41,7 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
                 _, height = F._get_image_size(image)
                 target['boxes'][:, [1, 3]] = height - target['boxes'][:, [3, 1]]
                 if 'masks' in target:
-                    target['masks'] = target['masks'].flip(-1)
+                    target['masks'] = target['masks'].flip(-2)
         return image, target
 
 def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transform: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -79,7 +79,7 @@ def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transf
     total_tensor = nonnegative_height_tensor * nonnegative_vals_tensor * nonnegative_width_tensor
     proper_instances = torch.where(total_tensor == 1)
     out_boxes = out_boxes[proper_instances]
-    areas = (out_boxes[:, 2] - out_boxes[:, 0]) * (out_boxes[:, 1] - out_boxes[:, 3])
+    areas = (out_boxes[:, 2] - out_boxes[:, 0]) * (out_boxes[:, 3] - out_boxes[:, 1])
     return areas, out_boxes
 
 def target_from_masks(masks: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -134,7 +134,7 @@ class RandomRotation(T.RandomRotation):
                 for key, value in corrected_target.items():
                     target[key] = value
             else:
-                matrix = torch.tensor([[math.cos(rad), -math.sin(rad)], [math.sin(rad), math.cos(rad)]], dtype=torch.float32)
+                matrix = torch.tensor([[math.cos(rad), math.sin(rad)], [-math.sin(rad), math.cos(rad)]], dtype=torch.float32)
                 target['areas'], target['boxes'] = transform_boxes(image, target, matrix)
         return image, target
 
@@ -161,12 +161,16 @@ class GaussianBlur(T.GaussianBlur):
         image = super().forward(image)
         return image, target
 
+class Normalize(T.Normalize):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image = super().forward(image)
+        return image, target
 
 transform_mappings = {
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),
-    'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.5, contrast=0.5)], p=0.5),
+    'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25)], p=0.5),
     'blur': RandomApply([GaussianBlur(3)], p=0.5),
     'sharpness': RandomAdjustSharpness(1.2, 0.5)
 }

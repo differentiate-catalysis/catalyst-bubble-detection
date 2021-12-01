@@ -61,74 +61,97 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
     image = Image.open(os.path.join(image_root, image_name)).convert(mode='RGB')
     width = image.width
     height = image.height
-    with open(os.path.join(json_root, image_name[:-4] + '.json')) as fp:
-        json_data = json.load(fp)
-        annotations = json_data['annotations']
-        bubbles = []
-        for circle in annotations:
-            if 'ellipse' in circle:
-                ellipse = circle['ellipse']
-                center_x = ellipse['center']['x']
-                center_y = ellipse['center']['y']
-                radius_x = ellipse['radius']['x']
-                radius_y = ellipse['radius']['y']
-                bubbles.append(np.array([center_x, center_y, radius_x, radius_y]))
+    has_label = os.path.isfile(os.path.join(json_root, image_name[:-4] + '.json'))
+    if has_label:
+        with open(os.path.join(json_root, image_name[:-4] + '.json')) as fp:
+            json_data = json.load(fp)
+            annotations = json_data['annotations']
+            bubbles = []
+            for circle in annotations:
+                if 'ellipse' in circle:
+                    ellipse = circle['ellipse']
+                    center_x = ellipse['center']['x']
+                    center_y = ellipse['center']['y']
+                    radius_x = ellipse['radius']['x']
+                    radius_y = ellipse['radius']['y']
+                    bubbles.append(np.array([center_x, center_y, radius_x, radius_y]))
 
-    # Allocate space for mask
-    mask = np.zeros((len(bubbles), height, width), dtype=np.uint8)
+        # Allocate space for mask
+        mask = np.zeros((len(bubbles), height, width), dtype=np.uint8)
 
-    for i, bubble in enumerate(bubbles):
-        center_x = bubble[0]
-        center_y = bubble[1]
-        radius_x = bubble[2]
-        radius_y = bubble[3]
-        # Generate points for mask
-        rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
-        # Limit these to only points in the image
-        cc = cc[rr < height]
-        rr = rr[rr < height]
-        rr = rr[cc < width]
-        cc = cc[cc < width]
-        cc = cc[rr >= 0]
-        rr = rr[rr >= 0]
-        rr = rr[cc >= 0]
-        cc = cc[cc >= 0]
-        mask[i, rr, cc] = 1
+        for i, bubble in enumerate(bubbles):
+            center_x = bubble[0]
+            center_y = bubble[1]
+            radius_x = bubble[2]
+            radius_y = bubble[3]
+            # Generate points for mask
+            rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
+            # Limit these to only points in the image
+            cc = cc[rr < height]
+            rr = rr[rr < height]
+            rr = rr[cc < width]
+            cc = cc[cc < width]
+            cc = cc[rr >= 0]
+            rr = rr[rr >= 0]
+            rr = rr[cc >= 0]
+            cc = cc[cc >= 0]
+            mask[i, rr, cc] = 1
 
     # Prepare for patching
     image = np.asarray(image)
-    n_patches_w = math.ceil(width / patch_size)
-    overlap_w = n_patches_w * patch_size - width
-    n_overlaps_w = n_patches_w - 1
-    # Concept: Be on the lookout for magic camels.
-    overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w)) // n_overlaps_w
-    dec_indices = np.random.default_rng().choice(n_overlaps_w, size=((-overlap_w % n_overlaps_w)), replace=False) + 1
-    overlaps_w[dec_indices] -= 1
-    overlaps_w[0] = 0
-    overlaps_w = np.cumsum(overlaps_w)
+    if patch_size == -1:
+        n_patches_w = 1
+        n_patches_h = 1
+    else:
+        n_patches_w = math.ceil(width / patch_size)
+        overlap_w = n_patches_w * patch_size - width
+        n_overlaps_w = n_patches_w - 1
+        # Concept: Be on the lookout for magic camels.
+        overlaps_w = np.ones(n_patches_w, dtype=np.int32) * (overlap_w + (-overlap_w % n_overlaps_w)) // n_overlaps_w
+        dec_indices = np.random.default_rng().choice(n_overlaps_w, size=((-overlap_w % n_overlaps_w)), replace=False) + 1
+        overlaps_w[dec_indices] -= 1
+        overlaps_w[0] = 0
+        overlaps_w = np.cumsum(overlaps_w)
 
-    n_patches_h = math.ceil(height / patch_size)
-    overlap_h = n_patches_h * patch_size - height
-    n_overlaps_h = n_patches_h - 1
-    overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h)) // n_overlaps_h
-    dec_indices = np.random.default_rng().choice(n_overlaps_h, size=((-overlap_h % n_overlaps_h)), replace=False) + 1
-    overlaps_h[dec_indices] -= 1
-    overlaps_h[0] = 0
-    overlaps_h = np.cumsum(overlaps_h)
+        n_patches_h = math.ceil(height / patch_size)
+        overlap_h = n_patches_h * patch_size - height
+        n_overlaps_h = n_patches_h - 1
+        overlaps_h = np.ones(n_patches_h, dtype=np.int32) * (overlap_h + (-overlap_h % n_overlaps_h)) // n_overlaps_h
+        dec_indices = np.random.default_rng().choice(n_overlaps_h, size=((-overlap_h % n_overlaps_h)), replace=False) + 1
+        overlaps_h[dec_indices] -= 1
+        overlaps_h[0] = 0
+        overlaps_h = np.cumsum(overlaps_h)
 
     for i in range(n_patches_w):
         for j in range(n_patches_h):
-            patch = image[patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i], :]
-            masks = mask[:, patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i]]
+            # Disable patching
+            if patch_size == -1:
+                patch = image
+                if has_label:
+                    masks = mask
+            else:
+                patch = image[patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i], :]
+                if has_label:
+                    masks = mask[:, patch_size * j - overlaps_h[j] : patch_size * (j + 1) - overlaps_h[j], patch_size * i - overlaps_w[i] : patch_size * (i + 1) - overlaps_w[i]]
 
-            target = target_from_masks(torch.from_numpy(masks))
-            masks = target['masks'].numpy()
-            boxes = target['boxes'].numpy()
-            areas = target['areas'].numpy()
+            if has_label:
+                target = target_from_masks(torch.from_numpy(masks))
+                masks = target['masks'].numpy()
+                boxes = target['boxes'].numpy()
+                areas = target['areas'].numpy()
+
             image_out = Image.fromarray(patch, mode='RGB')
 
+
+            if not has_label:
+                target_output_dir = os.path.join(trial_dir, 'test', 'targets') # Must be test if no label
+                image_output_dir = os.path.join(trial_dir, 'test', 'patches')
+                image_out.save(os.path.join(image_output_dir, '%s_%d_%d.png' % (image_name[:-4], i, j)))
+                np.save(os.path.join(target_output_dir, '%s_%d_%d_masks.npy' % (image_name[:-4], i, j)), np.array(0))
+                np.save(os.path.join(target_output_dir, '%s_%d_%d_boxes.npy' % (image_name[:-4], i, j)), np.array(0))
+                np.save(os.path.join(target_output_dir, '%s_%d_%d_areas.npy' % (image_name[:-4], i, j)), np.array(0))
             # Only save patches with bubbles in them
-            if 0 not in masks.shape and 0 not in boxes.shape:
+            elif 0 not in masks.shape and 0 not in boxes.shape:
                 rand_num = torch.rand(1)
                 if rand_num < splits[0]:
                     split = 'test'
@@ -218,4 +241,3 @@ def label_to_bubble_json(label_file, json_file: str=None):
             json.dump(outdir, outfp, indent=2)
     return outdir
  
-    

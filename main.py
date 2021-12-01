@@ -10,8 +10,8 @@ from train import train_model
 from optimize import optimize
 from utils import gen_args
 from conversions import gen_label_images, gen_targets
-from models import model_mappings as rcnn_models
-from evaluate import run_apply
+from models import model_keys as rcnn_models
+from evaluate import run_apply, run_metrics
 
 from MatCNN.image2npy import convert_dir
 from MatCNN.evaluate import run_stitch
@@ -46,18 +46,20 @@ def main(args: SimpleNamespace):
     if 'gen_targets' in args.mode:
         gen_targets(args)
         valid_mode = True
-    if args.model in rcnn_models.keys():
+    if args.model in rcnn_models:
         if 'train' in args.mode:
             if args.gpu and args.mp:
                 mp.spawn(train_model, nprocs=args.gpu, args=(args,))
             train_model(args.gpu, args)
             valid_mode = True
+        if 'evaluate' in modes:
+            loss = run_apply(args)
+            run_metrics(args, loss=loss)
         if 'apply' in modes:
             run_apply(args)
             valid_mode = True
         if 'metrics' in modes:
-            #TODO: Add metrics functionality
-            #run_metrics(args)
+            run_metrics(args)
             valid_mode = True
         if 'optimize' in args.mode:
             optimize(args)
@@ -69,6 +71,10 @@ def main(args: SimpleNamespace):
             else:
                 mat_train(args.gpu, args)
             valid_mode = True
+        if 'evaluate' in modes:
+            loss = run_apply(args)
+            run_stitch(args)
+            run_metrics(args, loss=loss)
         if 'apply' in modes:
             mat_run_apply(args)
             valid_mode = True
@@ -76,7 +82,6 @@ def main(args: SimpleNamespace):
             run_stitch(args)
             valid_mode = True
         if 'metrics' in modes:
-            #TODO: Add metrics functionality
             mat_run_metrics(args)
             valid_mode = True
         if 'optimize' in args.mode:
@@ -163,9 +168,11 @@ if __name__ == '__main__':
     parser.add_argument('--test_set', type=str, help='Dataset to use only as test')
     parser.add_argument('--val_set', type=str, help='Dataset to use only as validation')
     parser.add_argument('--blocks', type=int, help='Number of encoding blocks to use in each architecture')
-    parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation')
+    parser.add_argument('--patch_size', type=int, help='Size of patches to use for target generation. Set to -1 to disable patching')
     parser.add_argument('--data_split', type=float, nargs=3, help="3 floats for test validation train split of data in image2npy (in order test, validation, train)", dest='split')
     parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
+    parser.add_argument('--imagenet_stats', action='store_true', help='Use ImageNet stats instead of dataset stats for normalization')
+    parser.add_argument('--stats_file', type=str, help='JSON file to read stats from')
 
     args = parser.parse_args()
     defaults = {
@@ -214,7 +221,7 @@ if __name__ == '__main__':
         'aug': False,
         'version': None,
         'patience': 0,
-        'image_size': [852, 852],
+        'image_size': [1920, 1080],
         'num_patches': [3],
         'overlap_size': None,
         'slices': 8,
@@ -237,6 +244,8 @@ if __name__ == '__main__':
         'patch_size': 300,
         'split': [0.1, 0.2, 0.7],
         'gamma': 0.001,
+        'imagenet_stats': False,
+        'stats_file': None,
     }
     if args.config:
         if os.path.isfile(args.config):

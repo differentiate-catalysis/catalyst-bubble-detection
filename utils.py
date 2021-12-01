@@ -1,23 +1,51 @@
 import argparse
 import json
 import os
+import pickle
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple, Union
 
-import skimage.draw
-import torch
 import numpy as np
-from torch.nn.modules.module import Module
+import torch
 import torch.utils.data
+import torchvision
 from PIL import Image
+from torch.nn.modules.module import Module
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler
-import torchvision
-from torchvision.transforms.functional import to_pil_image
+from torchvision.transforms.functional import pil_to_tensor, to_pil_image
+from tqdm import tqdm
 
-from transforms import Compose, ToTensor, transform_mappings
-import pickle
+from transforms import Compose, ToTensor, transform_mappings, Normalize
 
+
+def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
+    images = []
+    for split_path in split_paths:
+        images.extend(list(Path(split_path).rglob('*.jpg')))
+        images.extend(list(Path(split_path).rglob('*.png')))
+    mean_tensor = torch.zeros((3, len(images)))
+    std_tensor = torch.zeros((3, len(images)))
+    for i, image_path in enumerate(tqdm(images, desc='Calculating mean...')):
+        im = Image.open(image_path).convert('RGB')
+        im = pil_to_tensor(im).float() / 255
+        means = torch.mean(im, dim=(-1, -2))
+        mean_tensor[:, i] = means
+    means = torch.mean(mean_tensor, dim=-1)
+    for i, image_path in enumerate(tqdm(images, desc='Calculating stddev...')):
+        im = Image.open(image_path).convert('RGB')
+        im = pil_to_tensor(im).float() / 255
+        stds = torch.mean((im - means.reshape(3, 1, 1))**2, dim=(-1, -2))
+        std_tensor[:, i] = stds
+    weight = image_size[0] * image_size[1]
+    std = torch.sqrt(weight * torch.sum(std_tensor, dim=-1) / (weight * len(images) - 1))
+    means = means.cpu().tolist()
+    std = std.cpu().tolist()
+    with open(os.path.join(split_paths[0], '..', 'stats.json'), 'w') as f:
+        json.dump({'mean': means, 'std': std}, f)
+
+    return means, std
 
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
@@ -39,7 +67,8 @@ class Dataset(torch.utils.data.Dataset):
         self.target_root = os.path.join(root, 'targets/')
         self.image_ids = os.listdir(self.patch_root)
         self.training = training
-        self.transforms = transforms
+        self.stats = os.path.join(root, '..', 'stats.json')
+        self.transform = get_transforms(self.training, transforms)
         # if num_images == -1:
             # self.num_images = len(os.listdir(self.image_root))
         # else:
@@ -52,21 +81,20 @@ class Dataset(torch.utils.data.Dataset):
         mask = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_masks.npy')))
         boxes = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_boxes.npy')))
         areas = torch.from_numpy(np.load(os.path.join(self.target_root, image_id[:-4] + '_areas.npy')))
-        # masks = torch.sum(mask, dim=0).byte()
-        # masks[masks >= 1] = 255
-        # img = to_pil_image(masks).convert('L')
-        # img.save('/home/jim/masks/%s.png' % image_id)
 
-        # Fill target according to COCO standard
-        target['boxes'] = boxes
-        target['area'] = areas
-        target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
-        target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
-        target['masks'] = mask
-        target['image_id'] = torch.tensor([index])
-        # Augment the image and target
-        transform = get_transforms(self.training, self.transforms)
-        image, target = transform(image, target)
+        if not (torch.any(mask) or torch.any(boxes) or torch.any(areas)): #Account for 0 targets (i.e. unlabeled image evaluated)
+            target = None
+            image, _ = self.transform(image)
+        else:
+            target['boxes'] = boxes
+            target['area'] = areas
+            target['labels'] = torch.ones(boxes.shape[0], dtype=torch.int64)
+            target['iscrowd'] = torch.zeros(boxes.shape[0], dtype=torch.uint8)
+            target['masks'] = mask
+            target['image_id'] = torch.tensor([index])
+            # Augment the image and target
+
+            image, target = self.transform(image, target)
         return image, target
 
     def __len__(self):
@@ -86,6 +114,8 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
+    if not os.path.isfile(os.path.join(args.root, 'stats.json')):
+        compute_mean_and_std([os.path.join(args.root, args.name, 'train'), os.path.join(args.root, args.name, 'validation')], args.image_size)
     training_data = Dataset(os.path.join(args.root, args.name, 'train'), args.transforms, True, num_images=args.num_images)
     print("Number of labels in training data: " + str(training_data.get_num_labels()))
     validation_data = Dataset(os.path.join(args.root, args.name, 'validation'), args.transforms, False)

@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import sys
@@ -9,13 +10,13 @@ import ray
 import torch
 import torch.distributed as dist
 import torch.utils.data
+from ray import tune
 from torch import Tensor
 from torch.nn import Module
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from ray import tune
 
 from evaluate import evaluate
 from models import model_mappings
@@ -49,7 +50,8 @@ def train_model(gpu: int, args: SimpleNamespace):
         gpu = -1
         amp = False
         device = torch.device('cpu')
-    model = model_mappings[args.model].to(device)
+    train_loader, valid_loader = get_dataloaders(args, world_size, rank)
+    model = model_mappings(args).to(device)
     if args.mp:
         model = DDP(model, device_ids=[gpu])
     # Only touch trainable parameters
@@ -62,7 +64,6 @@ def train_model(gpu: int, args: SimpleNamespace):
         raise ValueError('Invalid optimizer specified')
     # Lower LR every 3 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=args.gamma)
-    train_loader, valid_loader = get_dataloaders(args, world_size, rank)
     iou_max = 0
     model_dir = os.path.join(args.save, '%s.pth' % args.name)
     epoch_init = 1

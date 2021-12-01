@@ -63,10 +63,10 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         if test:
                             this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
                             if 'boxes' in output:
-                                box_cpu = output['boxes'].cpu()
+                                box_cpu = output['boxes']
                                 np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
                             if 'masks' in output:
-                                mask_cpu = output['masks'].cpu()
+                                mask_cpu = output['masks']
                                 np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)
                             #if scores:
                                 #np.save(os.path.join(save_dir, 'scores', this_image), scores)

@@ -37,16 +37,16 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         boxes = []
         target_boxes = []
         scores = []
-        if isinstance(valid_loader.dataset, VideoDataset):
-            has_target = [None]
-        else:
-            _, has_target = next(iter((valid_loader)))
-        if has_target[0] is not None:
-            coco = get_coco_api_from_dataset(valid_loader.dataset)
-            iou_types = get_iou_types(model)
-            coco_evaluator = CocoEvaluator(coco, iou_types)
+        # Check if the dataset has labels. This doesn't apply for VideoDatasets
+        if isinstance(valid_loader.dataset, Dataset):
+            _, targets = next(iter((valid_loader)))
+            if targets[0] is not None:
+                coco = get_coco_api_from_dataset(valid_loader.dataset)
+                iou_types = get_iou_types(model)
+                coco_evaluator = CocoEvaluator(coco, iou_types)
         for j, (images, targets) in enumerate(tqdm(valid_loader)):
             images = list(image.to(device) for image in images)
+            # If the target exists, push the target tensors to the right device
             has_target = targets[0] is not None
             if has_target:
                 targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
@@ -54,7 +54,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                 outputs = model(images)
                 res = {}
                 for i, output in enumerate(outputs):
-                    # NMS the boxes prior to evaluation
+                    # NMS the boxes prior to evaluation, push to CPU for pyCocoTools
                     indices = torchvision.ops.nms(output['boxes'], output['scores'], 0.3)
                     output = {k: v[indices].cpu() for k, v in output.items()}
                     boxes.append(output['boxes'].to(device))
@@ -76,6 +76,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                                 tune.report(loss=10000, iou=0, map=0)
                             return 10000, 0, 0
                         total_loss += loss * valid_loader.batch_size
+                    # If set to test/apply mode, save out the predicted bounding boxes, masks, and scores
                     if test:
                         if isinstance(valid_loader.dataset, Dataset):
                             this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
@@ -86,11 +87,12 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                             box_cpu = output['boxes'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
                         if 'masks' in output:
-                            mask_cpu = output['masks'].cpu()
+                            mask_cpu = output['masks'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)
                         if scores:
-                            scores_cpu = output['scores'].cpu()
+                            scores_cpu = output['scores'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'scores', this_image), scores_cpu)
+        # Finish pyCocoTools evaluation
         if has_target:
             coco_evaluator.synchronize_between_processes()
             coco_evaluator.accumulate()

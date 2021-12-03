@@ -173,6 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
     parser.add_argument('--imagenet_stats', action='store_true', help='Use ImageNet stats instead of dataset stats for normalization')
     parser.add_argument('--stats_file', type=str, help='JSON file to read stats from')
+    parser.add_argument('--video', type=str, help='Video file to perform inference on')
 
     args = parser.parse_args()
     defaults = {
@@ -246,6 +247,7 @@ if __name__ == '__main__':
         'gamma': 0.001,
         'imagenet_stats': False,
         'stats_file': None,
+        'video': None,
     }
     if args.config:
         if os.path.isfile(args.config):

@@ -1,5 +1,6 @@
 import argparse
 import json
+from math import ceil
 import os
 import pickle
 from pathlib import Path
@@ -109,6 +110,25 @@ class Dataset(torch.utils.data.Dataset):
                 # annotations = json_data['annotations']
                 # sum += len(annotations)
         return sum
+
+class VideoDataset(torch.utils.data.Dataset):
+    def __init__(self, video_file: str):
+        self.reader = torchvision.io.VideoReader(video_file)
+        metadata = self.reader.get_metadata()
+        self.transform = get_transforms(False, [])
+        self.length = ceil(metadata['video']['duration'][0] * metadata['video']['fps'][0])
+
+    def __getitem__(self, index):
+        target = None
+        image = next(self.reader)['data']
+        image = to_pil_image(image, mode='RGB')
+        image, _ = self.transform(image)
+        if index == self.length:
+            self.reader.seek(0)
+        return image, target
+
+    def __len__(self):
+        return self.length
 
 def collate_fn(batch):
     return tuple(zip(*batch))

@@ -16,6 +16,7 @@ from tqdm import tqdm
 import skimage.io
 import cv2
 import numpy as np
+import pandas as pd
 
 from coco_eval import CocoEvaluator
 from coco_utils import get_coco_api_from_dataset
@@ -265,7 +266,7 @@ def compare_bubbles(center,radius,prev_circles,min_dist=10):
             return new, coalesced, volume_change, matching_circle_data['id']
         else:
             coalesced=None
-            return new, coalesced, volume_change, matching_circle_data['id'] 
+            return new, coalesced, volume_change, matching_circle_data['id']
     else: #No match found, therefore circle is new
         new=True; coalesced=False; volume_change=None; old_id=None
         return new, coalesced, volume_change, old_id
@@ -303,7 +304,7 @@ def redraw_fig(frame,bubble_dict,color_dict={'new':(224, 230, 73),'coalesced':(9
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
     return edit_frame
 
-def label_image(image_file, npy_file, bubble_color=(255,0,0) write_frame_csv=False, save_image=False):
+def label_image(image_file, npy_file, save_dir, bubble_color=(255,0,0), write_frame_csv=False, save_image=False):
     '''
     Takes in an image file a npy file with bounding boxes, returns a single image with bubbles marked.
     Parameters
@@ -312,6 +313,8 @@ def label_image(image_file, npy_file, bubble_color=(255,0,0) write_frame_csv=Fal
         name of image file to annotate
     npy_file: str
         name of .npy file containing bounding boxes corresponding to the image frame
+    save_dir: str
+        path to directory to write CSVs and images to
     bubble_color: tuple
         RGB color used to label bubbles in the image
     write_frame_csv: bool
@@ -329,6 +332,10 @@ def label_image(image_file, npy_file, bubble_color=(255,0,0) write_frame_csv=Fal
     curr_boxes = np.load(npy_file)
     curr_circles={} #Tracking dict for all bubbles in frame
     circle_counter = 0
+    image_dir = os.path.join(save_dir, 'labeled_images')
+    csv_dir = os.path.join(save_dir, 'csv')
+    os.makedirs(image_dir, exist_ok=True)
+    os.makedirs(csv_dir, exist_ok=True)
     for box in curr_boxes:
         curr_circles[circle_counter]={} #Tracking dict for current bubble
         center = [0.5*(box[0]+box[2]),0.5*(box[1]+box[3])] #Center averaging
@@ -346,14 +353,14 @@ def label_image(image_file, npy_file, bubble_color=(255,0,0) write_frame_csv=Fal
     if write_frame_csv:
         curr_df = pd.DataFrame.from_dict(curr_circles).T.drop(columns=['center',\
                                                     'radius']).sort_values(by='id')
-        curr_df.to_csv(f'frame_single.csv',index=False)
+        curr_df.to_csv(os.path.join(csv_dir, f'frame_single.csv'),index=False)
     edit_frame = redraw_fig(full_frame,curr_circles,color_dict=color_dict)
     if save_image:
-        cv2.imwrite('frame_single.png',edit_frame)
+        cv2.imwrite(os.path.join(image_dir, 'frame_single.png'),edit_frame)
     return edit_frame
 
 
-def label_volume(movie_file, npy_folder, write_frame_csv=False, write_overall=False, save_video=False):
+def label_volume(movie_file, npy_folder, save_dir, write_frame_csv=False, write_overall=False, save_video=False):
     '''
     Takes in a movie file and all specified bounding boxes, returns descriptor files and edited movie.
     Parameters
@@ -362,6 +369,8 @@ def label_volume(movie_file, npy_folder, write_frame_csv=False, write_overall=Fa
         path to the movie file to be parsed
     npy_folder: str
         folder name containing .npy files per frame of bounding boxes
+    save_dir: str
+        path to directory to write CSVs and images to
     write_frame_csv: bool
         trigger to write csv files at each frame that describe all bubbles
     write_overall: bool
@@ -381,13 +390,15 @@ def label_volume(movie_file, npy_folder, write_frame_csv=False, write_overall=Fa
     num_bubbles_li = []
     max_id_num = 0
     frame = 0
-    npy_files = sorted(np.array(os.listdir(npy_folder)).tolist(),\
-                       key = lambda x: int(x.split('_')[0]))
+    npy_files = sorted(np.array(os.listdir(npy_folder)).tolist())
+    video_path = os.path.join(save_dir, os.path.basename(movie_file))
+    csv_dir = os.path.join(save_dir, 'csv')
+    os.makedirs(csv_dir, exist_ok=True)
     while success: #Iterating over initial image frames, writing new frames to new video
         success,curr_frame = capture.read()
         if new_vid is None and save_video: #Open new video to begin writing, if desired
             fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
-            new_vid = cv2.VideoWriter('test_vid_out.mov',fourcc,60,\
+            new_vid = cv2.VideoWriter(video_path,fourcc,60,\
                                        (int(capture.get(3)),int(capture.get(4))))
         if not success:
             break
@@ -428,10 +439,12 @@ def label_volume(movie_file, npy_folder, write_frame_csv=False, write_overall=Fa
         if len(curr_circles)>0:
             curr_df = pd.DataFrame.from_dict(curr_circles).T.drop(columns=['center',\
                                                                 'radius']).sort_values(by='id')
+        else:
+            curr_df = None
         if save_video: #Write edited frame to new video
             new_vid.write(redraw_fig(curr_frame,curr_circles))
-        if write_frame_csv:
-            curr_df.to_csv(f'frame_{frame}.csv',index=False)
+        if write_frame_csv and curr_df is not None:
+            curr_df.to_csv(os.path.join(csv_dir, f'frame_{frame}.csv'),index=False)
         prev_circles = curr_circles
         frame+=1
     #Release videos when runs are done
@@ -489,6 +502,9 @@ def run_apply(args):
             os.makedirs(os.path.join(save_dir, subdir))
 
     loss = evaluate(model, test_loader, args.amp, gpu, save_dir = save_dir, test=True)
+    if args.video:
+        npy_dir = os.path.join(save_dir, 'boxes')
+        label_volume(args.video, npy_dir, save_dir, True, True, True)
     return loss
 
 def run_metrics(args, loss=None):

@@ -268,7 +268,8 @@ def compare_bubbles(center,radius,prev_circles,min_dist=10):
         new=True; coalesced=False; volume_change=None; old_id=None
         return new, coalesced, volume_change, old_id
 
-def redraw_fig(frame,bubble_dict):
+def redraw_fig(frame,bubble_dict,color_dict={'new':(224, 230, 73),'coalesced':(96, 66, 245),\
+                  'growing':(50, 168, 82),'shrinking':(150, 0, 0),'unchanged':(179, 247, 255)}):
     '''
     Uses OpenCV functions on an existing frame to add circles based on category as well as id numbers
     Parameters
@@ -277,6 +278,8 @@ def redraw_fig(frame,bubble_dict):
         image array of shape (x_len, y_len, 3) containing bubbles
     bubble_dict: dict
         dictionary containing all relevant info of current circles
+    color_dict: dict
+        dictionary containing all RGB colors for five modes (new, coalesced, growing, shrinking, unchanged)
     Returns
     -------
     edit_frame: ndarray
@@ -284,8 +287,6 @@ def redraw_fig(frame,bubble_dict):
     '''
     change_cutoff=50
     edit_frame = frame.copy()
-    color_dict = {'new':(224, 230, 73),'coalesced':(96, 66, 245),\
-                  'growing':(50, 168, 82),'shrinking':(150, 0, 0),'unchanged':(179, 247, 255)}
     for b in bubble_dict.keys():
         bubble = bubble_dict[b]
         color=None
@@ -300,15 +301,65 @@ def redraw_fig(frame,bubble_dict):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
     return edit_frame
 
-def label_volume(movie_file, all_boxes, write_frame_csv=False, write_overall=False, save_video=False):
+def label_image(image_file, npy_file, bubble_color=(255,0,0) write_frame_csv=False, save_image=False):
+    '''
+    Takes in an image file a npy file with bounding boxes, returns a single image with bubbles marked.
+    Parameters
+    ----------
+    image_file: str
+        name of image file to annotate
+    npy_file: str
+        name of .npy file containing bounding boxes corresponding to the image frame
+    bubble_color: tuple
+        RGB color used to label bubbles in the image
+    write_frame_csv: bool
+        trigger to write a single csv file that describe all bubbles
+    save_image: bool
+        trigger to write a separate image file with circles and ids per bubble
+    Returns
+    -------
+    edit_frame: ndarray
+        final image after insertion of circles at marked bubble coordinates
+    '''
+    color_dict = {}
+    for i in ['new','coalesced','growing','shrinking','unchanged']: color_dict[i]=bubble_color
+    full_frame = cv2.imread(image_file)
+    curr_boxes = np.load(npy_file)
+    curr_circles={} #Tracking dict for all bubbles in frame
+    circle_counter = 0
+    for box in curr_boxes:
+        curr_circles[circle_counter]={} #Tracking dict for current bubble
+        center = [0.5*(box[0]+box[2]),0.5*(box[1]+box[3])] #Center averaging
+        curr_circles[circle_counter]['center'] = center
+        curr_circles[circle_counter]['center_x'] = int(center[0])
+        curr_circles[circle_counter]['center_y'] = int(center[1])
+        radius = 0.5*(abs(box[0]-center[0]) + abs(box[1]-center[1])) #Radius averaging
+        curr_circles[circle_counter]['radius'] = radius
+        curr_circles[circle_counter]['diameter'] = int(radius*2)
+        curr_circles[circle_counter]['volume_change']=None
+        curr_circles[circle_counter]['new']=True
+        curr_circles[circle_counter]['coalesced']=False
+        curr_circles[circle_counter]['id']=circle_counter
+        circle_counter+=1
+    if write_frame_csv:
+        curr_df = pd.DataFrame.from_dict(curr_circles).T.drop(columns=['center',\
+                                                    'radius']).sort_values(by='id')
+        curr_df.to_csv(f'frame_single.csv',index=False)
+    edit_frame = redraw_fig(full_frame,curr_circles,color_dict=color_dict)
+    if save_image:
+        cv2.imwrite('frame_single.png',edit_frame)
+    return edit_frame
+
+
+def label_volume(movie_file, npy_folder, write_frame_csv=False, write_overall=False, save_video=False):
     '''
     Takes in a movie file and all specified bounding boxes, returns descriptor files and edited movie.
     Parameters
     ----------
     movie_file: str
         path to the movie file to be parsed
-    all_boxes: list
-        list of bounding box locations at each time step
+    npy_folder: str
+        folder name containing .npy files per frame of bounding boxes
     write_frame_csv: bool
         trigger to write csv files at each frame that describe all bubbles
     write_overall: bool
@@ -328,6 +379,8 @@ def label_volume(movie_file, all_boxes, write_frame_csv=False, write_overall=Fal
     num_bubbles_li = []
     max_id_num = 0
     frame = 0
+    npy_files = sorted(np.array(os.listdir(npy_folder)).tolist(),\
+                       key = lambda x: int(x.split('_')[0]))
     while success: #Iterating over initial image frames, writing new frames to new video
         success,curr_frame = capture.read()
         if new_vid is None and save_video: #Open new video to begin writing, if desired
@@ -336,7 +389,7 @@ def label_volume(movie_file, all_boxes, write_frame_csv=False, write_overall=Fal
                                        (int(capture.get(3)),int(capture.get(4))))
         if not success:
             break
-        curr_boxes = all_boxes[frame]
+        curr_boxes = np.load(os.path.join(npy_folder,npy_files[frame]))
         curr_circles = {} #Tracking dict for bubbles in current frame
         circle_counter = 0
         vol_in_frame = 0
@@ -390,7 +443,8 @@ def label_volume(movie_file, all_boxes, write_frame_csv=False, write_overall=Fal
     return overall_df
 
 #Test use, if desired
-#_ = label_volume('test_bubbles.mov',all_boxes,write_overall=True,save_video=True)
+#_ = label_volume('test_bubbles.mov',boxes_npy_folder,write_overall=True,save_video=True)
+#_ = label_image('test_image.png',boxes_npy_file)
 
 
 def run_apply(args):

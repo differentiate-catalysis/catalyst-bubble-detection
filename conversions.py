@@ -1,20 +1,21 @@
 import json
-import os
-
-import torch
-from transforms import target_from_masks
-import skimage.draw
-import shutil
-import numpy as np
-import cv2 as cv
 import math
+import os
+import shutil
+
+import cv2 as cv
+import numpy as np
 import parsl
+import skimage.draw
+import torch
 from parsl import python_app
 from parsl.config import Config
 from parsl.executors.threads import ThreadPoolExecutor
-
 from PIL import Image, ImageDraw
 from tqdm import tqdm
+
+from transforms import target_from_masks
+
 
 def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
     with open(infile, 'r') as infp:
@@ -36,9 +37,11 @@ def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
             json.dump(outdir, outfp, indent=2)
     return outdir
 
+
 def getjsontype(json_dict: dict) -> bool:
     #Returns True if the json_dict is in basic form, False if not (probably in v7 labs form and should convert)
     return not ({'bubbles', 'height', 'width', 'filename'} - set(json_dict.keys()))
+
 
 def gen_label_images(indir: str, outdir: str) -> None:
     in_files = [os.path.join(indir, f) for f in os.listdir(indir) if f.endswith('.json')]
@@ -55,6 +58,7 @@ def gen_label_images(indir: str, outdir: str) -> None:
         for bubble in json_data['bubbles']:
             drawer.ellipse([bubble['center'][0] - bubble['radius'], bubble['center'][1] - bubble['radius'], bubble['center'][0] + bubble['radius'], bubble['center'][1] + bubble['radius']], fill = 1)
         image.save(os.path.join(outdir, os.path.splitext(os.path.split(json_data['filename'])[1])[0] + '.png'))
+
 
 @python_app
 def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size, splits):
@@ -167,6 +171,7 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
                 np.save(os.path.join(target_output_dir, '%s_%d_%d_boxes.npy' % (image_name[:-4], i, j)), boxes)
                 np.save(os.path.join(target_output_dir, '%s_%d_%d_areas.npy' % (image_name[:-4], i, j)), areas)
 
+
 def gen_targets(args):
     local_threads = Config(
         executors=[
@@ -217,6 +222,7 @@ def gen_targets(args):
         result = worker.result()
     parsl.clear()
 
+
 def label_to_bubble_json(label_file, json_file: str=None):
     img = cv.imread(label_file,0)
     img = cv.GaussianBlur(img, (3,3), cv.BORDER_DEFAULT)
@@ -240,4 +246,3 @@ def label_to_bubble_json(label_file, json_file: str=None):
         with open(json_file, 'w') as outfp:
             json.dump(outdir, outfp, indent=2)
     return outdir
- 

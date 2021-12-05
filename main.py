@@ -1,25 +1,25 @@
 import argparse
 import json
-import shutil
 import os
+import shutil
 from types import SimpleNamespace
 
 import torch.multiprocessing as mp
 
-from train import train_model
-from optimize import optimize
-from utils import gen_args
 from conversions import gen_label_images, gen_targets
-from models import model_keys as rcnn_models
 from evaluate import run_apply, run_metrics
-
-from MatCNN.image2npy import convert_dir
-from MatCNN.evaluate import run_stitch
 from MatCNN.evaluate import run_apply as mat_run_apply
 from MatCNN.evaluate import run_metrics as mat_run_metrics
-from MatCNN.train import train as mat_train
-from MatCNN.optimize import optimize as mat_optimize
+from MatCNN.evaluate import run_stitch
+from MatCNN.image2npy import convert_dir
 from MatCNN.models import model_listing as mat_models
+from MatCNN.optimize import optimize as mat_optimize
+from MatCNN.train import train as mat_train
+from models import model_keys as rcnn_models
+from optimize import optimize
+from train import train_model
+from utils import gen_args
+
 
 def main(args: SimpleNamespace):
     if not os.path.isdir('saved'):
@@ -99,6 +99,7 @@ def main(args: SimpleNamespace):
         else:
             shutil.make_archive(data_dir, 'tar', args.root, args.name)
             shutil.rmtree(data_dir)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

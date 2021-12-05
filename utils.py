@@ -1,14 +1,15 @@
 import argparse
 import json
-from math import ceil
 import os
 import pickle
+from math import ceil
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
+import torch.distributed
 import torch.utils.data
 import torchvision
 from PIL import Image
@@ -18,7 +19,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.transforms.functional import pil_to_tensor, to_pil_image
 from tqdm import tqdm
 
-from transforms import Compose, ToTensor, transform_mappings, Normalize
+from transforms import Compose, ToTensor, transform_mappings
 
 
 def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
@@ -48,6 +49,7 @@ def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) ->
 
     return means, std
 
+
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
@@ -58,6 +60,7 @@ def get_transforms(training: bool, transforms: List[str]) -> Compose:
             else:
                 raise ValueError('Invalid transform %s supplied' % transform)
     return Compose(composition)
+
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, root: str, transforms: List[str], training: bool = False, num_images: int = -1):
@@ -111,6 +114,7 @@ class Dataset(torch.utils.data.Dataset):
                 # sum += len(annotations)
         return sum
 
+
 class VideoDataset(torch.utils.data.Dataset):
     def __init__(self, video_file: str):
         self.reader = torchvision.io.VideoReader(video_file)
@@ -130,8 +134,10 @@ class VideoDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.length
 
+
 def collate_fn(batch):
     return tuple(zip(*batch))
+
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
     if not os.path.isfile(os.path.join(args.root, 'stats.json')):
@@ -153,6 +159,7 @@ def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Opti
 
     return train_loader, valid_loader
 
+
 def warmup_lr_scheduler(optimizer: Optimizer, warmup_iters: int, warmup_factor: float) -> torch.optim.lr_scheduler.LambdaLR:
     def f(x):
         if x >= warmup_iters:
@@ -161,6 +168,7 @@ def warmup_lr_scheduler(optimizer: Optimizer, warmup_iters: int, warmup_factor: 
         return warmup_factor * (1 - alpha) + alpha
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, f)
+
 
 def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> SimpleNamespace:
     full_args = defaults.copy()
@@ -176,6 +184,7 @@ def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, f
         full_args['config'] = config
     return SimpleNamespace(**full_args)
 
+
 def get_iou_types(model: Module):
     model_without_ddp = model
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
@@ -186,6 +195,7 @@ def get_iou_types(model: Module):
     if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
         iou_types.append("keypoints")
     return iou_types
+
 
 def all_gather(data):
     """

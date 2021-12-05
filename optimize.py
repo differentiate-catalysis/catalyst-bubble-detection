@@ -1,25 +1,25 @@
-from functools import partial
+import json
+import math
 import os
+import random
+from functools import partial
+from types import SimpleNamespace
 from typing import Dict
 
-import torch
 import numpy.random as nprd
-
 import ray
+import torch
 from ray import tune
 from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
-from types import SimpleNamespace
-from train import train_model
-from utils import gen_args
-import random
-import math
 from ray.tune.integration.torch import DistributedTrainableCreator, distributed_checkpoint_dir
-import json
+from ray.tune.schedulers import ASHAScheduler
 
-from models import model_mappings, model_keys
-from transforms import transform_mappings
 from conversions import gen_targets
+from models import model_keys
+from train import train_model
+from transforms import transform_mappings
+from utils import gen_args
+
 
 def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None, args_space: SimpleNamespace = None, dir: str = None):
     if dir:
@@ -45,6 +45,7 @@ def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None,
         gen_targets(args)
     train_model(0, args)
 
+
 def pick_model(args: SimpleNamespace):
     if not set(args.sampling_models).issubset(set(model_keys)):
         raise ValueError('Sampling models contain invalid values')
@@ -53,11 +54,6 @@ def pick_model(args: SimpleNamespace):
         return model.lower()
     return f
 
-# def pick_batch_size(args: SimpleNamespace):
-    # def f(spec):
-        # batch_size = 2 ** nprd.randint(0, int(math.log2(args.batch_size) + 1))
-        # return batch_size
-    # return f
 
 def pick_optimizer(args: SimpleNamespace):
     if not set(args.optimizers).issubset(set(['adam', 'adamw', 'sgd'])):
@@ -66,12 +62,14 @@ def pick_optimizer(args: SimpleNamespace):
         return random.choice(args.optimizers)
     return f
 
+
 def pick_transforms(args: SimpleNamespace):
     if not set(args.transforms).issubset(set(transform_mappings)):
         raise ValueError('Transforms to sample from contain invalid values')
     def f(spec):
         return random.sample(args.transforms, nprd.randint(0, len(args.transforms) + 1))
     return f
+
 
 def pick_batch_size(args: SimpleNamespace):
     def f(spec):
@@ -81,12 +79,14 @@ def pick_batch_size(args: SimpleNamespace):
         return 2 ** exp
     return f
 
+
 def pick_patch_size(args: SimpleNamespace):
     if args.min_patch_size > args.max_patch_size:
         raise ValueError('Min patch size is larger than max patch size')
     def f(spec):
         return nprd.randint(args.min_patch_size, args.max_patch_size + 1)
     return f
+
 
 def optimize(args):
     if len(args.root) > 0 and args.root[0] != '/':

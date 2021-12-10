@@ -1,9 +1,6 @@
-import json
 import math
 import os
-import sys
 from types import SimpleNamespace
-from typing import Tuple, Union
 
 import matplotlib.pyplot as plt
 import ray
@@ -11,7 +8,6 @@ import torch
 import torch.distributed as dist
 import torch.utils.data
 from ray import tune
-from torch import Tensor
 from torch.nn import Module
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, Optimizer
@@ -165,6 +161,7 @@ def train_model(gpu: int, args: SimpleNamespace):
 
         if args.graph:
             graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
+
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> float:
     if gpu != -1:

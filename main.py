@@ -1,25 +1,25 @@
 import argparse
 import json
-import shutil
 import os
+import shutil
 from types import SimpleNamespace
 
 import torch.multiprocessing as mp
 
-from train import train_model
-from optimize import optimize
-from utils import gen_args
 from conversions import gen_label_images, gen_targets
-from models import model_keys as rcnn_models
 from evaluate import run_apply, run_metrics
-
-from MatCNN.image2npy import convert_dir
-from MatCNN.evaluate import run_stitch
 from MatCNN.evaluate import run_apply as mat_run_apply
 from MatCNN.evaluate import run_metrics as mat_run_metrics
-from MatCNN.train import train as mat_train
-from MatCNN.optimize import optimize as mat_optimize
+from MatCNN.evaluate import run_stitch
+from MatCNN.image2npy import convert_dir
 from MatCNN.models import model_listing as mat_models
+from MatCNN.optimize import optimize as mat_optimize
+from MatCNN.train import train as mat_train
+from models import model_keys as rcnn_models
+from optimize import optimize
+from train import train_model
+from utils import gen_args
+
 
 def main(args: SimpleNamespace):
     if not os.path.isdir('saved'):
@@ -100,6 +100,7 @@ def main(args: SimpleNamespace):
             shutil.make_archive(data_dir, 'tar', args.root, args.name)
             shutil.rmtree(data_dir)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=str, help='Root directory for the dataset')
@@ -173,6 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, help='Amount to decrease LR by every 3 epochs')
     parser.add_argument('--imagenet_stats', action='store_true', help='Use ImageNet stats instead of dataset stats for normalization')
     parser.add_argument('--stats_file', type=str, help='JSON file to read stats from')
+    parser.add_argument('--video', type=str, help='Video file to perform inference on')
 
     args = parser.parse_args()
     defaults = {
@@ -246,6 +248,7 @@ if __name__ == '__main__':
         'gamma': 0.001,
         'imagenet_stats': False,
         'stats_file': None,
+        'video': None,
     }
     if args.config:
         if os.path.isfile(args.config):

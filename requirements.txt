@@ -9,3 +9,6 @@ matplotlib
 pillow
 ray[tune]
 parsl
+pandas
+opencv-python
+av

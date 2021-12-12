@@ -37,17 +37,17 @@ def main(args: SimpleNamespace):
         os.mkdir(args.run_dir)
     if not os.path.isdir(data_dir) and os.path.isfile(data_dir + '.tar'):
         shutil.unpack_archive(data_dir + '.tar', extract_dir = args.root)
-    if 'gen_labels' in args.mode:
+    if 'gen_labels' in modes:
         gen_label_images(os.path.join(args.root, args.json_dir), os.path.join(args.root, 'labels'))
         valid_mode = True
     if 'image2npy' in modes:
         convert_dir(args)
         valid_mode = True
-    if 'gen_targets' in args.mode:
+    if 'gen_targets' in modes:
         gen_targets(args)
         valid_mode = True
     if args.model in rcnn_models:
-        if 'train' in args.mode:
+        if 'train' in modes:
             if args.gpu and args.mp:
                 mp.spawn(train_model, nprocs=args.gpu, args=(args,))
             train_model(args.gpu, args)
@@ -61,7 +61,7 @@ def main(args: SimpleNamespace):
         if 'metrics' in modes:
             run_metrics(args)
             valid_mode = True
-        if 'optimize' in args.mode:
+        if 'optimize' in modes:
             optimize(args)
             valid_mode = True
     elif args.model in mat_models:
@@ -85,7 +85,7 @@ def main(args: SimpleNamespace):
         if 'metrics' in modes:
             mat_run_metrics(args)
             valid_mode = True
-        if 'optimize' in args.mode:
+        if 'optimize' in modes:
             mat_optimize(args)
             valid_mode = True
     if not valid_mode:

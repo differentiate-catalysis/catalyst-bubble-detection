@@ -72,9 +72,10 @@ def main(args: SimpleNamespace):
                 mat_train(args.gpu, args)
             valid_mode = True
         if 'evaluate' in modes:
-            loss = run_apply(args)
+            loss = mat_run_apply(args)
             run_stitch(args)
-            run_metrics(args, loss=loss)
+            mat_run_metrics(args, loss=loss)
+            valid_mode = True
         if 'apply' in modes:
             mat_run_apply(args)
             valid_mode = True

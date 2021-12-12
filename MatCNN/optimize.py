@@ -129,9 +129,9 @@ def pick_patch_size(args: SimpleNamespace):
     def f(spec):
         model = spec.config.model
         slices = spec.config.slices
-        max_patch = get_max_patch_size(model, slices)
-        max_patch = min(max_patch_arg, max_patch)
-        patch_size = 64 * nprd.randint(min_patch_arg // 64, max_patch // 64 + 1)
+        #max_patch = get_max_patch_size(model, slices)
+        #max_patch = min(max_patch_arg, max_patch)
+        patch_size = 64 * nprd.randint(min_patch_arg // 64, max_patch_arg // 64 + 1)
         return patch_size
     return f
 

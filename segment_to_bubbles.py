@@ -44,7 +44,7 @@ def prediction_to_bubble_dir(pred_dir, json_dir = None, label_dir = None):
         os.makedirs(label_dir)
     files = [f for f in os.listdir(pred_dir) if os.path.isfile(os.path.join(pred_dir, f))]
     for file in tqdm(files):
-        json_file = os.path.join(json_dir, file) if json_dir else None
+        json_file = os.path.join(json_dir, os.path.splitext(file)[0] + '.json') if json_dir else None
         label_file = os.path.join(label_dir, file) if label_dir else None
         label_to_bubble_json(os.path.join(pred_dir, file), json_file, label_file)
 

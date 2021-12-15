@@ -37,10 +37,6 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         # Check if the dataset has labels. This doesn't apply for VideoDatasets
         if isinstance(valid_loader.dataset, Dataset):
             _, targets = next(iter((valid_loader)))
-            # if targets[0] is not None:
-                # coco = get_coco_api_from_dataset(valid_loader.dataset)
-                # iou_types = get_iou_types(model)
-                # coco_evaluator = CocoEvaluator(coco, iou_types)
         for j, (images, targets) in enumerate(tqdm(valid_loader)):
             images = list(image.to(device) for image in images)
             # If the target exists, push the target tensors to the right device
@@ -49,7 +45,6 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                 targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
             with torch.cuda.amp.autocast(enabled=amp):
                 outputs = model(images)
-                # res = {}
                 for i, output in enumerate(outputs):
                     # NMS the boxes prior to evaluation, push to CPU for pyCocoTools
                     indices = torchvision.ops.nms(output['boxes'], output['scores'], 0.3)
@@ -65,10 +60,6 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         target = targets[i]
                         target_list.append(target)
                         target_boxes.append(target['boxes'].to(device))
-                        # res[target['image_id'].item()] = output
-                        # coco_evaluator.update(res)
-
-                        # Must set model to train mode to get loss
                         model.train()
                         loss_dict = model(images, targets)
                         loss = sum(loss for loss in loss_dict.values()).item()
@@ -96,12 +87,11 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                             scores_cpu = output['scores'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'scores', this_image), scores_cpu)
         # Finish pyCocoTools evaluation
-        if has_target:
+        if has_target and not test:
             mAP, iou = get_metrics(output_list, target_list, valid_loader.dataset)
-            if not test:
-                print('--- evaluation result ---')
-                print('loss: %.5f, mAP %.5f, IoU %.5f' % (total_loss / num_samples, mAP, iou))
-                return total_loss / num_samples, iou, mAP
+            print('--- evaluation result ---')
+            print('loss: %.5f, mAP %.5f, IoU %.5f' % (total_loss / num_samples, mAP, iou))
+            return total_loss / num_samples, iou, mAP
         return total_loss / num_samples
 
 
@@ -116,6 +106,7 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
     coco_evaluator.accumulate()
     stats = coco_evaluator.summarize()
 
+    # TODO: calculate IoU
     return stats[0][0], 0.0
 
 # def get_metrics(boxes: List[Tensor], scores: List[Tensor], targets: List[Tensor], device: torch.device, iou_threshold: float = 0.5) -> Tuple[torch.Tensor, torch.Tensor]:

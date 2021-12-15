@@ -8,6 +8,8 @@ from torchvision.models.detection.faster_rcnn import FasterRCNN, FastRCNNPredict
 from torchvision.models.detection.mask_rcnn import MaskRCNN, MaskRCNNPredictor
 from torchvision.models.detection.retinanet import RetinaNet, RetinaNetHead, retinanet_resnet50_fpn
 
+from utils import compute_mean_and_std
+
 
 def faster_rcnn(image_mean: List[float], image_std: List[float]) -> FasterRCNN:
     model = fasterrcnn_resnet50_fpn(pretrained=True, image_mean=image_mean, image_std=image_std)
@@ -40,6 +42,8 @@ def model_mappings(args: SimpleNamespace):
             stats = args.stats_file
         else:
             stats = os.path.join(args.root, args.name, 'stats.json')
+            if not os.path.isfile(os.path.join(args.root, 'stats.json')):
+                compute_mean_and_std([os.path.join(args.root, args.name, 'train'), os.path.join(args.root, args.name, 'validation')], args.image_size)
         with open(stats) as f:
             stats = json.load(f)
             mean = stats['mean']

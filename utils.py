@@ -140,8 +140,6 @@ def collate_fn(batch):
 
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
-    if not os.path.isfile(os.path.join(args.root, 'stats.json')):
-        compute_mean_and_std([os.path.join(args.root, args.name, 'train'), os.path.join(args.root, args.name, 'validation')], args.image_size)
     training_data = Dataset(os.path.join(args.root, args.name, 'train'), args.transforms, True, num_images=args.num_images)
     print("Number of labels in training data: " + str(training_data.get_num_labels()))
     validation_data = Dataset(os.path.join(args.root, args.name, 'validation'), args.transforms, False)

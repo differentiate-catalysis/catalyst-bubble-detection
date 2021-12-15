@@ -108,8 +108,8 @@ def optimize(args):
     if not os.path.isdir(name_dir):
         os.mkdir(name_dir)
     scheduler = ASHAScheduler(
-            metric='loss',
-            mode='min',
+            metric='map',
+            mode='max',
             max_t=args.max_epochs,
             grace_period=1,
             reduction_factor=2
@@ -139,7 +139,9 @@ def optimize(args):
             progress_reporter = reporter,
             resume=args.resume,
     )
-    best_trial = result.get_best_trial('loss', 'min', 'last')
+    best_trial = result.get_best_trial('map', 'max', 'last')
+    df = result.dataframe(metric='map', mode='max')
+    df.to_csv(os.path.join(name_dir, 'trials.csv'))
     if best_trial is not None:
         print('Best trial config: {}'.format(best_trial.config))
         print('Best trial final validation loss: {}'.format(

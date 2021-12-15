@@ -1,14 +1,12 @@
 import math
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from torch import tensor
 import torch.utils.data
 import torchvision
 from ray import tune
-from torch import Tensor
 from torch.nn import Module
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -16,11 +14,11 @@ from tqdm import tqdm
 from coco_eval import CocoEvaluator
 from coco_utils import get_coco_api_from_dataset
 from models import model_mappings
-from utils import Dataset, VideoDataset, collate_fn, get_iou_types
+from utils import Dataset, VideoDataset, collate_fn
 from visualize import label_volume
 
 
-def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: str = None, test: bool = False, apply: bool = True, metrics: bool = True) -> Tuple[float, float, float]:
+def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: Optional[str] = None, test: bool = False, apply: bool = True, metrics: bool = True) -> Tuple[float, float, float]:
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:

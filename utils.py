@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
+import skimage.draw
 import torch
 import torch.distributed
 import torch.utils.data
@@ -237,3 +238,17 @@ def all_gather(data):
         data_list.append(pickle.loads(buffer))
 
     return data_list
+
+
+def get_circle_coords(center_y: float, center_x: float, rad_y: float, rad_x: float, height: int, width: int) -> Tuple[np.ndarray, np.ndarray]:
+    rr, cc = skimage.draw.ellipse(center_y, center_x, rad_y, rad_x)
+    cc = cc[rr < height]
+    rr = rr[rr < height]
+    rr = rr[cc < width]
+    cc = cc[cc < width]
+    cc = cc[rr >= 0]
+    rr = rr[rr >= 0]
+    rr = rr[cc >= 0]
+    cc = cc[cc >= 0]
+    return rr, cc
+

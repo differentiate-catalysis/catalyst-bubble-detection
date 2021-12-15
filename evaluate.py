@@ -9,6 +9,7 @@ import torchvision
 from ray import tune
 from torch.nn import Module
 from torch.utils.data import DataLoader
+from torchvision.transforms import functional as F
 from tqdm import tqdm
 
 from coco_eval import CocoEvaluator
@@ -16,6 +17,7 @@ from coco_utils import get_coco_api_from_dataset
 from models import model_mappings
 from utils import Dataset, VideoDataset, collate_fn
 from visualize import label_volume
+from utils import get_circle_coords
 
 
 def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: Optional[str] = None, test: bool = False, apply: bool = True, metrics: bool = True) -> Tuple[float, float, float]:
@@ -104,8 +106,40 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
     coco_evaluator.accumulate()
     stats = coco_evaluator.summarize()
 
+    image, _ = dataset[0]
+    width, height = F._get_image_size(image)
+    ious = []
+    for target, output in zip(targets, outputs):
+        target_mask = np.zeros((height, width), dtype=np.uint8)
+        output_mask = np.zeros((height, width), dtype=np.uint8)
+        for box in target['boxes']:
+            x0, y0, x1, y1 = box.cpu().numpy()
+            x_rad = x1 - x0
+            y_rad = y1 - y0
+            avg_rad = (x_rad + y_rad) / 2
+            center_x = (x0 + x1) / 2
+            center_y = (y0 + y1) / 2
+            rr, cc = get_circle_coords(center_y, center_x, avg_rad, avg_rad, height, width)
+            target_mask[rr, cc] = 1
+
+        for box in output['boxes']:
+            x0, y0, x1, y1 = box.cpu().numpy()
+            x_rad = x1 - x0
+            y_rad = y1 - y0
+            avg_rad = (x_rad + y_rad) / 2
+            center_x = (x0 + x1) / 2
+            center_y = (y0 + y1) / 2
+            rr, cc = get_circle_coords(center_y, center_x, avg_rad, avg_rad, height, width)
+            output_mask[rr, cc] = 1
+
+        intersection = np.sum(target_mask * output_mask)
+        union = np.sum( (target_mask + output_mask) > 0)
+        ious.append(intersection / union)
+
+    iou = np.mean(ious)
+
     # TODO: calculate IoU
-    return stats[0][0], 0.0
+    return stats[0][0], iou
 
 # def get_metrics(boxes: List[Tensor], scores: List[Tensor], targets: List[Tensor], device: torch.device, iou_threshold: float = 0.5) -> Tuple[torch.Tensor, torch.Tensor]:
     # # Map each box index to its image

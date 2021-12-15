@@ -3,10 +3,8 @@ import math
 import os
 import shutil
 
-import cv2 as cv
 import numpy as np
 import parsl
-import skimage.draw
 import torch
 from parsl import python_app
 from parsl.config import Config
@@ -15,6 +13,7 @@ from PIL import Image, ImageDraw
 from tqdm import tqdm
 
 from transforms import target_from_masks
+from utils import get_circle_coords
 
 
 def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
@@ -89,16 +88,7 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
             radius_x = bubble[2]
             radius_y = bubble[3]
             # Generate points for mask
-            rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
-            # Limit these to only points in the image
-            cc = cc[rr < height]
-            rr = rr[rr < height]
-            rr = rr[cc < width]
-            cc = cc[cc < width]
-            cc = cc[rr >= 0]
-            rr = rr[rr >= 0]
-            rr = rr[cc >= 0]
-            cc = cc[cc >= 0]
+            rr, cc = get_circle_coords(center_y, center_x, radius_y, radius_x, height, width)
             mask[i, rr, cc] = 1
 
     # Prepare for patching

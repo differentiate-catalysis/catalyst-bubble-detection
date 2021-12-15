@@ -55,6 +55,7 @@ def main(args: SimpleNamespace):
         if 'evaluate' in modes:
             loss = run_apply(args)
             run_metrics(args, loss=loss)
+            valid_mode = True
         if 'apply' in modes:
             run_apply(args)
             valid_mode = True

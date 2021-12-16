@@ -16,7 +16,7 @@ from coco_eval import CocoEvaluator
 from coco_utils import get_coco_api_from_dataset
 from models import model_mappings
 from utils import Dataset, VideoDataset, collate_fn
-from visualize import label_volume
+from visualize import label_image, label_volume
 from utils import get_circle_coords
 
 
@@ -46,9 +46,12 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
             with torch.cuda.amp.autocast(enabled=amp):
                 outputs = model(images)
                 for i, output in enumerate(outputs):
+                    if 'masks' in output:
+                        output = process_masks(output)
                     # NMS the boxes prior to evaluation, push to CPU for pyCocoTools
                     indices = torchvision.ops.nms(output['boxes'], output['scores'], 0.3)
                     output = {k: v[indices].cpu() for k, v in output.items()}
+                    output = remove_concetric_circles(output)
                     coco_output = {
                         'boxes': output['boxes'],
                         'scores': output['scores'],
@@ -74,9 +77,11 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                     if test:
                         if isinstance(valid_loader.dataset, Dataset):
                             this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
+                            write_image = True
                         else:
                             filename_length = len(str(len(valid_loader.dataset)))
                             this_image = str(j).zfill(filename_length)
+                            write_image = False
                         if 'boxes' in output:
                             box_cpu = output['boxes'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
@@ -86,6 +91,8 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         if 'scores' in output:
                             scores_cpu = output['scores'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'scores', this_image), scores_cpu)
+                        if write_image:
+                            label_image(os.path.join(valid_loader.dataset.patch_root, this_image), os.path.join(save_dir, 'boxes', this_image + '.npy'), save_dir, save_image=True)
         # Finish pyCocoTools evaluation
         if has_target and not test:
             mAP, iou = get_metrics(output_list, target_list, valid_loader.dataset)
@@ -114,9 +121,9 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
         output_mask = np.zeros((height, width), dtype=np.uint8)
         for box in target['boxes']:
             x0, y0, x1, y1 = box.cpu().numpy()
-            x_rad = x1 - x0
-            y_rad = y1 - y0
-            avg_rad = (x_rad + y_rad) / 2
+            x_dia = x1 - x0
+            y_dia = y1 - y0
+            avg_rad = (x_dia + y_dia) / 4
             center_x = (x0 + x1) / 2
             center_y = (y0 + y1) / 2
             rr, cc = get_circle_coords(center_y, center_x, avg_rad, avg_rad, height, width)
@@ -124,22 +131,78 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
 
         for box in output['boxes']:
             x0, y0, x1, y1 = box.cpu().numpy()
-            x_rad = x1 - x0
-            y_rad = y1 - y0
-            avg_rad = (x_rad + y_rad) / 2
+            x_dia = x1 - x0
+            y_dia = y1 - y0
+            avg_rad = (x_dia + y_dia) / 4
             center_x = (x0 + x1) / 2
             center_y = (y0 + y1) / 2
             rr, cc = get_circle_coords(center_y, center_x, avg_rad, avg_rad, height, width)
             output_mask[rr, cc] = 1
 
         intersection = np.sum(target_mask * output_mask)
-        union = np.sum( (target_mask + output_mask) > 0)
+        union = np.sum((target_mask + output_mask) > 0)
         ious.append(intersection / union)
 
     iou = np.mean(ious)
 
-    # TODO: calculate IoU
     return stats[0][0], iou
+
+
+def process_masks(output: Dict[str, torch.Tensor], iou_threshold: float = 0.8) -> Dict[str, torch.Tensor]:
+    indices = []
+    for i, (box, mask) in enumerate(zip(output['boxes'], output['masks'])):
+        mask = mask[0] >= 0.5
+        box_mask = torch.zeros_like(mask)
+        x0, y0, x1, y1 = box.cpu().numpy()
+        x_dia = x1 - x0
+        y_dia = y1 - y0
+        avg_rad = (x_dia + y_dia) / 4
+        center_x = (x0 + x1) / 2
+        center_y = (y0 + y1) / 2
+        rr, cc = get_circle_coords(center_y, center_x, avg_rad, avg_rad, mask.shape[0], mask.shape[1])
+        box_mask[rr, cc] = 1
+
+        intersection = torch.sum(box_mask * mask)
+        union = torch.sum((box_mask + mask) > 0)
+        iou = intersection / union
+
+        if iou > iou_threshold:
+            indices.append(i)
+
+    output = {k: v[indices] for k, v in output.items()}
+    return output
+
+def remove_concetric_circles(output: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    boxes = output['boxes']
+    # X, Y, R
+    circle_coords = torch.zeros((boxes.shape[0], 3), device=boxes.device, dtype=torch.float32)
+    circle_coords[:, 0] = (boxes[:, 2] + boxes[:, 0]) / 2
+    circle_coords[:, 1] = (boxes[:, 3] + boxes[:, 1]) / 2
+    circle_coords[:, 2] = (boxes[:, 2] + boxes[:, 3] - boxes[:, 0] - boxes[:, 1]) / 4
+    grid = torch.tile(circle_coords, (boxes.shape[0], 1)).reshape(boxes.shape[0], boxes.shape[0], 3)
+
+    # Necessary for broadcasting
+    x_y_coords = circle_coords[:, np.newaxis, :2]
+    # Subtract the row's xy coords from the col xy
+    grid[:, :, :2] -= x_y_coords
+    center_dist_and_r = torch.empty((boxes.shape[0], boxes.shape[0], 2), dtype=torch.float32, device=boxes.device)
+    # Set the first elem of each row - col to be the distance of their centers
+    center_dist_and_r[:, :, 0] = torch.sqrt(torch.sum(grid[:, :, :2]**2, dim=-1))
+    # Broadcast
+    rads = circle_coords[:, np.newaxis, 2:]
+    # Set the second elem of each row - col to be col radius - row radius
+    center_dist_and_r[:, :, 1:] = grid[:, :, 2:] - rads
+    # Center distance - (col rad - row rad)
+    diff = center_dist_and_r[:, :, 0] - center_dist_and_r[:, :, 1]
+    # N x N: true if row index is contained in col index
+    row_contained_in_col = diff <= 0
+    # N: Number of bubbles the index is contained in + 1
+    contained_in_other = torch.sum(row_contained_in_col, dim=-1)
+    indices = contained_in_other <= 1
+
+    output = {k: v[indices] for k, v in output.items()}
+    return output
+
 
 # def get_metrics(boxes: List[Tensor], scores: List[Tensor], targets: List[Tensor], device: torch.device, iou_threshold: float = 0.5) -> Tuple[torch.Tensor, torch.Tensor]:
     # # Map each box index to its image

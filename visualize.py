@@ -178,10 +178,10 @@ def label_image(image_file: str, npy_file: str, save_dir: str, bubble_color: Tup
     if write_frame_csv:
         curr_df = pd.DataFrame.from_dict(curr_circles).T.drop(columns=['center',\
                                                     'radius']).sort_values(by='id')
-        curr_df.to_csv(os.path.join(csv_dir, f'frame_single.csv'),index=False)
+        curr_df.to_csv(os.path.join(csv_dir, f'{os.path.basename(image_file)[:-4]}.csv'),index=False)
     edit_frame = redraw_fig(full_frame,curr_circles,color_dict=color_dict)
     if save_image:
-        cv2.imwrite(os.path.join(image_dir, 'frame_single.png'),edit_frame)
+        cv2.imwrite(os.path.join(image_dir, os.path.basename(image_file)),edit_frame)
     return edit_frame
 
 

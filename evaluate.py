@@ -117,8 +117,8 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
     width, height = F._get_image_size(image)
     ious = []
     for target, output in zip(targets, outputs):
-        target_mask = np.zeros((height, width), dtype=np.uint8)
-        output_mask = np.zeros((height, width), dtype=np.uint8)
+        target_mask = torch.zeros((height, width), dtype=torch.uint8)
+        output_mask = torch.zeros((height, width), dtype=torch.uint8)
         for box in target['boxes']:
             x0, y0, x1, y1 = box.cpu().numpy()
             x_dia = x1 - x0
@@ -139,8 +139,9 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
             rr, cc = get_circle_coords(center_y, center_x, avg_rad, avg_rad, height, width)
             output_mask[rr, cc] = 1
 
-        intersection = np.sum(target_mask * output_mask)
-        union = np.sum((target_mask + output_mask) > 0)
+        intersection = torch.sum(target_mask * output_mask)
+        union = torch.sum((target_mask + output_mask) > 0)
+
         ious.append(intersection / union)
 
     iou = np.mean(ious)

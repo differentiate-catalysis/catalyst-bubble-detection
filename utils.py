@@ -70,7 +70,7 @@ class Dataset(torch.utils.data.Dataset):
         self.patch_root = os.path.join(root, 'patches/')
         # self.json_root = os.path.join(root, '..', 'json/')
         self.target_root = os.path.join(root, 'targets/')
-        self.image_ids = os.listdir(self.patch_root)
+        self.image_ids = sorted(os.listdir(self.patch_root))
         self.training = training
         self.stats = os.path.join(root, '..', 'stats.json')
         self.transform = get_transforms(self.training, transforms)

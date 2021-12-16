@@ -85,11 +85,11 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         if 'boxes' in output:
                             box_cpu = output['boxes'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
-                        if 'masks' in output:
-                            mask_cpu = output['masks'].cpu().numpy()
+                        if 'masks' in coco_output:
+                            mask_cpu = coco_output['masks'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'masks', this_image), mask_cpu)
-                        if 'scores' in output:
-                            scores_cpu = output['scores'].cpu().numpy()
+                        if 'scores' in coco_output:
+                            scores_cpu = coco_output['scores'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'scores', this_image), scores_cpu)
                         if write_image:
                             label_image(os.path.join(valid_loader.dataset.patch_root, this_image), os.path.join(save_dir, 'boxes', this_image + '.npy'), save_dir, save_image=True)
@@ -204,81 +204,6 @@ def remove_concetric_circles(output: Dict[str, torch.Tensor]) -> Dict[str, torch
     return output
 
 
-# def get_metrics(boxes: List[Tensor], scores: List[Tensor], targets: List[Tensor], device: torch.device, iou_threshold: float = 0.5) -> Tuple[torch.Tensor, torch.Tensor]:
-    # # Map each box index to its image
-    # label_images = []
-    # for i in range(len(targets)):
-        # label_images.extend([i] * targets[i].shape[0])
-    # label_images = torch.tensor(label_images, device=device, dtype=torch.long)
-
-    # detection_images = []
-    # for i in range(len(boxes)):
-        # detection_images.extend([i] * boxes[i].shape[0])
-    # detection_images = torch.tensor(detection_images, device=device, dtype=torch.long)
-
-    # # Replacement for flatten, cannot flatten since non-rectangular
-    # targets = torch.cat(targets, dim=0)
-    # boxes = torch.cat(boxes, dim=0)
-    # scores = torch.cat(scores, dim=0)
-
-    # # Keep track of already matched boxes
-    # detected_targets = torch.zeros(label_images.shape[0], device=device, dtype=torch.long)
-
-    # num_detections = boxes.shape[0]
-    # if num_detections == 0:
-        # return 0, 0
-
-    # scores, indices = torch.sort(scores, dim=0, descending=True)
-    # detection_images = detection_images[indices]
-
-    # true_positives = torch.zeros((num_detections), device=device, dtype=torch.float)
-    # false_positives = torch.zeros((num_detections), device=device, dtype=torch.float)
-    # iou = torch.zeros((num_detections), device=device, dtype=torch.float)
-    # for i in range(num_detections):
-        # box = boxes[i : i + 1]
-        # image = detection_images[i]
-
-        # # Check for boxes from the same image
-        # image_targets = targets[label_images == image]
-        # if image_targets.shape[0] == 0:
-            # false_positives[i] = 1
-            # continue
-
-        # ious = torchvision.ops.box_iou(box, image_targets)
-        # max_iou, idx = torch.max(ious[0], dim=0)
-        # # Get the index of the target that we matched with
-        # original_idx = torch.arange(0, targets.shape[0], dtype=torch.long)[label_images == image][idx]
-
-        # # Handle a match - if we've already matched to this target before, count as false positive
-        # if max_iou > iou_threshold:
-            # if detected_targets[original_idx] == 0:
-                # iou[i] = max_iou
-                # true_positives[i] = 1
-                # detected_targets[original_idx] = 1
-            # else:
-                # false_positives[i] = 1
-        # else:
-            # false_positives[i] = 1
-
-    # cumulative_true_positives = torch.cumsum(true_positives, dim=0)
-    # cumulative_false_positives = torch.cumsum(false_positives, dim=0)
-    # cumulative_precision = cumulative_true_positives / (cumulative_true_positives + cumulative_false_positives + 1e-7)
-    # cumulative_recall = cumulative_true_positives / targets.shape[0]
-
-    # # Calculate precision
-    # recall_thresholds = torch.arange(start=0, end=1.1, step=.1)
-    # precisions = torch.zeros((len(recall_thresholds)), device=device, dtype=torch.float)
-    # for i, t in enumerate(recall_thresholds):
-        # recalls_above_t = cumulative_recall >= t
-        # if recalls_above_t.any():
-            # precisions[i] = cumulative_precision[recalls_above_t].max()
-        # else:
-            # precisions[i] = 0.
-    # average_precisions = precisions.mean()
-    # mean_iou = iou.mean()
-    # return average_precisions, mean_iou
-
-
 def run_apply(args):
     if args.video:
         test_dir = os.path.join(os.path.join(args.root, args.name, args.test_dir))
@@ -326,27 +251,21 @@ def run_apply(args):
 
 
 def run_metrics(args, loss=None):
-    if args.mp and args.gpu > -1:
-        gpu = args.gpu - 1
-    else:
-        gpu = args.gpu
-    if gpu != -1:
-        device = torch.device('cuda', gpu)
-    else:
-        device = torch.device('cpu')
     test_dir = os.path.join(args.root, args.name, args.test_dir)
     save_dir = '%s/predictions/%s' % (test_dir, args.name)
-    boxes = [torch.tensor(np.load(os.path.join(save_dir, 'boxes', file)), device=device) for file in sorted(os.listdir(os.path.join(save_dir, 'boxes')))]
-    scores = [torch.tensor(np.load(os.path.join(save_dir, 'scores', file)), device=device) for file in sorted(os.listdir(os.path.join(save_dir, 'scores')))]
     output_list = []
-    for box, score in zip(boxes, scores):
+    files = sorted(os.listdir(os.path.join(save_dir, 'boxes')))
+    for file in files:
+        box = torch.from_numpy(np.load(os.path.join(save_dir, 'boxes', file)))
+        score = torch.from_numpy(np.load(os.path.join(save_dir, 'scores', file)))
         output = {
             'boxes': box,
             'scores': score,
-            'labels': torch.ones(box.shape[0])
+            'labels': torch.ones(box.shape[0], dtype=torch.int64)
         }
         output_list.append(output)
-    files = sorted(list(set([filename[:-9] for filename in os.listdir(os.path.join(test_dir, 'targets')) ] )))
+
+    files = sorted(list(set([filename[:-9] for filename in os.listdir(os.path.join(test_dir, 'targets'))])))
     target_list = []
     for i, file in enumerate(files):
         box = torch.from_numpy(np.load(os.path.join(test_dir, 'targets', file + 'boxes.npy')))
@@ -364,7 +283,11 @@ def run_metrics(args, loss=None):
     dataset = Dataset(os.path.join(args.root, args.name, args.test_dir), [], False)
     mAP, iou = get_metrics(output_list, target_list, dataset)
 
-    print('--- evaluation result ---')
-    print('loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou))
+    if loss is not None:
+        print('--- evaluation result ---')
+        print('loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou))
+    else:
+        print('--- evaluation result ---')
+        print('mAP %.5f, IoU %.5f' % (mAP, iou))
 
-    return  loss, iou, mAP
+    return loss, iou, mAP

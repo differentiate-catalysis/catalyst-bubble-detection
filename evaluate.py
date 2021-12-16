@@ -82,7 +82,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                             filename_length = len(str(len(valid_loader.dataset)))
                             this_image = str(j).zfill(filename_length)
                             write_image = False
-                        if 'boxes' in output:
+                        if 'boxes' in coco_output:
                             box_cpu = output['boxes'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'boxes', this_image), box_cpu)
                         if 'masks' in coco_output:

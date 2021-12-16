@@ -76,7 +76,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                     # If set to test/apply mode, save out the predicted bounding boxes, masks, and scores
                     if test:
                         if isinstance(valid_loader.dataset, Dataset):
-                            this_image = os.path.basename(os.listdir(valid_loader.dataset.patch_root)[j])
+                            this_image = os.path.basename(sorted(os.listdir(valid_loader.dataset.patch_root))[j])
                             write_image = True
                         else:
                             filename_length = len(str(len(valid_loader.dataset)))

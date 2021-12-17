@@ -96,7 +96,7 @@ def compare_bubbles(center: List[int], radius: float, prev_circles: Dict, min_di
 
 
 def redraw_fig(frame: np.ndarray, bubble_dict: np.ndarray, color_dict: Dict = {'new':(224, 230, 73),'coalesced':(96, 66, 245),\
-                  'growing':(50, 168, 82),'shrinking':(150, 0, 0),'unchanged':(179, 247, 255)}) -> np.ndarray:
+                  'growing':(50, 168, 82),'shrinking':(150, 0, 0),'unchanged':(179, 247, 255)}, frame_num: int = None) -> np.ndarray:
     '''
     Uses OpenCV functions on an existing frame to add circles based on category as well as id numbers
     Parameters
@@ -107,6 +107,8 @@ def redraw_fig(frame: np.ndarray, bubble_dict: np.ndarray, color_dict: Dict = {'
         dictionary containing all relevant info of current circles
     color_dict: dict
         dictionary containing all RGB colors for five modes (new, coalesced, growing, shrinking, unchanged)
+    frame_num: int
+        frame number to label imgae with
     Returns
     -------
     edit_frame: ndarray
@@ -126,6 +128,8 @@ def redraw_fig(frame: np.ndarray, bubble_dict: np.ndarray, color_dict: Dict = {'
         cv2.circle(edit_frame, (bubble['center_x'], bubble['center_y']), int(bubble['radius']), color, 3)
         cv2.putText(edit_frame, str(bubble['id']), (bubble['center_x']-9, bubble['center_y']+7),\
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        if frame_num:
+            cv2.putText(edit_frame, str(frame_num), (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
     return edit_frame
 
 
@@ -267,7 +271,7 @@ def label_volume(movie_file: str, npy_folder: str, save_dir: str, write_frame_cs
         else:
             curr_df = None
         if save_video: #Write edited frame to new video
-            new_vid.write(redraw_fig(curr_frame,curr_circles))
+            new_vid.write(redraw_fig(curr_frame,curr_circles, frame_num=frame))
         if write_frame_csv and curr_df is not None:
             curr_df.to_csv(os.path.join(csv_dir, f'frame_{frame}.csv'),index=False)
         prev_circles = curr_circles

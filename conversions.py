@@ -2,6 +2,7 @@ import json
 import math
 import os
 import shutil
+import random
 
 import cv2 as cv
 import numpy as np
@@ -61,7 +62,7 @@ def gen_label_images(indir: str, outdir: str) -> None:
 
 
 @python_app
-def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size, splits):
+def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size, splits, rand_num=None):
     image = Image.open(os.path.join(image_root, image_name)).convert(mode='RGB')
     width = image.width
     height = image.height
@@ -156,7 +157,8 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
                 np.save(os.path.join(target_output_dir, '%s_%d_%d_areas.npy' % (image_name[:-4], i, j)), np.array(0))
             # Only save patches with bubbles in them
             elif 0 not in masks.shape and 0 not in boxes.shape:
-                rand_num = torch.rand(1)
+                if rand_num is None:
+                    rand_num = torch.rand(1)
                 if rand_num < splits[0]:
                     split = 'test'
                 elif rand_num < splits[0] + splits[1]:
@@ -215,9 +217,12 @@ def gen_targets(args):
             os.mkdir(target_output_dir)
         if not os.path.isdir(image_output_dir):
             os.mkdir(image_output_dir)
-
+    random.seed(8995)
+    num_images = len(os.listdir(image_root))
+    split_numbers = [i / num_images for i in range(num_images)]
+    random.shuffle(split_numbers)
     for image_name in os.listdir(image_root):
-        workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, args.split))
+        workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, args.split, rand_num=split_numbers.pop()))
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()

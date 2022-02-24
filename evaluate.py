@@ -243,11 +243,20 @@ def run_metrics(args, loss=None):
         if 'boxes' in file:
             target_box_files.append(file)
     target_boxes = [torch.tensor(np.load(os.path.join(test_dir, 'targets', file))) for file in target_box_files]
+    stats_dir = os.path.join('saved/statistics', os.path.basename(args.root))
+    if not os.path.isdir(stats_dir):
+        os.makedirs(stats_dir)
 
     mAP, iou = 0, 0#get_metrics(boxes, scores, target_boxes, device, 0.5)
 
     #mAP = stats[0][0]
+
+    result_string = 'loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou)
+
     print('--- evaluation result ---')
-    print('loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou))
+    print(result_string)
+    
+    with open(os.path.join(stats_dir, '%s.txt' % (args.name)), 'w') as fp:
+        fp.write(result_string)
 
     return  loss, iou, mAP

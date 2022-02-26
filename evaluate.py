@@ -266,6 +266,9 @@ def run_metrics(args, loss=None):
             'labels': torch.ones(box.shape[0], dtype=torch.int64)
         }
         output_list.append(output)
+    stats_dir = os.path.join('saved/statistics', os.path.basename(args.root))
+    if not os.path.isdir(stats_dir):
+        os.makedirs(stats_dir)
 
     files = sorted(list(set([filename[:-9] for filename in os.listdir(os.path.join(test_dir, 'targets'))])))
     target_list = []
@@ -287,9 +290,13 @@ def run_metrics(args, loss=None):
 
     if loss is not None:
         print('--- evaluation result ---')
-        print('loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou))
+        result_string = 'loss: %.5f, mAP %.5f, IoU %.5f' % (loss, mAP, iou)
     else:
         print('--- evaluation result ---')
-        print('mAP %.5f, IoU %.5f' % (mAP, iou))
+        result_string = 'mAP %.5f, IoU %.5f' % (mAP, iou)
+    print(result_string)
+
+    with open(os.path.join(stats_dir, '%s.txt' % (args.name)), 'w') as fp:
+        fp.write(result_string)
 
     return loss, iou, mAP

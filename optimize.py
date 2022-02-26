@@ -84,9 +84,7 @@ def pick_patch_size(args: SimpleNamespace):
     if args.min_patch_size > args.max_patch_size:
         raise ValueError('Min patch size is larger than max patch size')
     def f(spec):
-        min_valid_64 = args.min_patch_size // 64 + 1
-        max_valid_64 = args.max_patch_size // 64
-        return nprd.randint(min_valid_64, max_valid_64 + 1) * 64
+        return nprd.randint(args.min_patch_size, args.max_patch_size + 1)
     return f
 
 

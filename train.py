@@ -189,8 +189,6 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
 
         if not math.isfinite(loss_value):
             print('Loss is %s, stopping training' % loss_value)
-            if tune.is_session_enabled():
-                tune.report(loss=10000, iou=0, map=0)
             return 10000
 
         scaler.scale(losses).backward()

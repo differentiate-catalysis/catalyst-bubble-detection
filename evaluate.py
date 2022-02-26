@@ -35,7 +35,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         output_list = []
         target_list = []
         # Check if the dataset has labels. This doesn't apply for VideoDatasets
-        if isinstance(valid_loader.dataset, Dataset):
+        if isinstance(valid_loader.dataset, Dataset) and len(valid_loader) > 0:
             _, targets = next(iter((valid_loader)))
         for j, (images, targets) in enumerate(tqdm(valid_loader)):
             images = list(image.to(device) for image in images)
@@ -69,8 +69,6 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                         model.eval()
                         if not math.isfinite(loss) and not test:
                             print('Loss is %s, stopping training' % loss)
-                            if tune.is_session_enabled():
-                                tune.report(loss=10000, iou=0, map=0)
                             return 10000, 0, 0
                         total_loss += loss * valid_loader.batch_size
                     # If set to test/apply mode, save out the predicted bounding boxes, masks, and scores

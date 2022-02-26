@@ -2,6 +2,7 @@ import json
 import os
 import random
 import shutil
+from typing import Tuple
 
 import cv2
 import numpy as np
@@ -11,6 +12,12 @@ from torchvision.transforms.functional import pil_to_tensor
 from tqdm import tqdm
 
 from utils import get_circle_coords
+
+
+def polar(r: float, theta: float, width: int, height: int) -> Tuple[int, int]:
+    x = r * np.cos(theta) + width / 2
+    y = r * np.sin(theta) + height / 2
+    return int(x), int(y)
 
 
 def extract_bubbles(image_root, json_root, output_dir, trim=2):
@@ -75,7 +82,7 @@ def augment_image(image: Image.Image):
     return image
 
 
-def generate_data(root: str, num_samples: int, min_bubble: int, max_bubble: int, width_padding: int = 200, height_padding: int = 200):
+def generate_data(root: str, num_samples: int, min_bubble: int, max_bubble: int, width_padding: int = 200, height_padding: int = 200, bubble_trim=2):
     image_root = os.path.join(root, 'images')
     json_root = os.path.join(root, 'json')
     background_root = os.path.join(root, 'backgrounds')
@@ -85,7 +92,7 @@ def generate_data(root: str, num_samples: int, min_bubble: int, max_bubble: int,
         shutil.rmtree(output_dir)
     os.makedirs(os.path.join(output_dir, 'images'))
     os.mkdir(os.path.join(output_dir, 'json'))
-    extract_bubbles(image_root, json_root, bubble_root)
+    extract_bubbles(image_root, json_root, bubble_root, trim=bubble_trim)
     num_bubbles = len(os.listdir(bubble_root))
     for sample in tqdm(range(num_samples)):
         output_json = {'annotations': []}
@@ -98,8 +105,11 @@ def generate_data(root: str, num_samples: int, min_bubble: int, max_bubble: int,
             bubble_path = os.path.join(bubble_root, random.choice(os.listdir(bubble_root)))
             bubble_image = Image.open(bubble_path).convert('RGBA')
             bubble_image = augment_image(bubble_image)
-            x = np.random.randint(width_padding, background.width - bubble_image.width + 1 - width_padding)
-            y = np.random.randint(height_padding, background.height - bubble_image.height + 1 - height_padding)
+            r = np.random.randint(min(width_padding, height_padding), min(background.width - bubble_image.width + 1 - width_padding, background.height - bubble_image.height + 1 - height_padding))/2 #* min(background.height - height_padding, background.width - width_padding)
+            theta = np.random.rand() * 2 * np.pi
+            x, y = polar(r, theta, background.width, background.height)
+            # x = np.random.randint(width_padding, background.width - bubble_image.width + 1 - width_padding)
+            # y = np.random.randint(height_padding, background.height - bubble_image.height + 1 - height_padding)
             mask_patch = mask[y: y + bubble_image.height, x: x + bubble_image.width]
             bubble_mask = np.asarray(bubble_image)[:, :, 3] // 255
             overlap_percent = np.sum(mask_patch & bubble_mask) / np.sum(bubble_mask)
@@ -130,4 +140,4 @@ def generate_data(root: str, num_samples: int, min_bubble: int, max_bubble: int,
 
 
 if __name__ == '__main__':
-    generate_data('data/data_generation/pristine', 200, 10, 60)
+    generate_data('data/data_generation/pristine', 50, 5, 20, bubble_trim=-2)

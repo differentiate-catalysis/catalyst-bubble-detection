@@ -51,6 +51,30 @@ def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) ->
     return means, std
 
 
+def compute_mean_and_std_video(data_root: str, video_file: str, image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
+    dataset = VideoDataset(video_file)
+    mean_tensor = torch.zeros((3, len(dataset)))
+    std_tensor = torch.zeros((3, len(dataset)))
+    for i, (im, _) in enumerate(tqdm(dataset, desc='Calculating mean...')):
+        im = im.float() / 255
+        means = torch.mean(im, dim=(-1, -2))
+        mean_tensor[:, i] = means
+    means = torch.mean(mean_tensor, dim=-1)
+    dataset = VideoDataset(video_file)
+    for i, (im, _) in enumerate(tqdm(dataset, desc='Calculating stddev...')):
+        im = im.float() / 255
+        stds = torch.mean((im - means.reshape(3, 1, 1))**2, dim=(-1, -2))
+        std_tensor[:, i] = stds
+    weight = image_size[0] * image_size[1]
+    std = torch.sqrt(weight * torch.sum(std_tensor, dim=-1) / (weight * len(dataset) - 1))
+    means = means.cpu().tolist()
+    std = std.cpu().tolist()
+    with open(os.path.join(data_root, 'stats.json'), 'w') as f:
+        json.dump({'mean': means, 'std': std}, f)
+
+    return means, std
+
+
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
@@ -128,7 +152,7 @@ class VideoDataset(torch.utils.data.Dataset):
         image = next(self.reader)['data']
         image = to_pil_image(image, mode='RGB')
         image, _ = self.transform(image)
-        if index == self.length:
+        if index == self.length - 1:
             self.reader.seek(0)
         return image, target
 
@@ -146,8 +170,8 @@ def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Opti
     validation_data = Dataset(os.path.join(args.root, args.name, 'validation'), args.transforms, False)
 
     if world_size is None or rank is None:
-        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)
-        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)
+        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs, pin_memory=True)
+        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs, pin_memory=True)
         return train_loader, valid_loader
 
     train_sampler = DistributedSampler(training_data, num_replicas=world_size, rank=rank, drop_last=True)

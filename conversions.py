@@ -1,8 +1,8 @@
 import json
 import math
 import os
-import shutil
 import random
+import shutil
 
 import numpy as np
 import parsl
@@ -11,10 +11,9 @@ from parsl import python_app
 from parsl.config import Config
 from parsl.executors.threads import ThreadPoolExecutor
 from PIL import Image, ImageDraw
-from tqdm import tqdm
 
 from transforms import target_from_masks
-from utils import get_circle_coords
+from utils import get_circle_coords, tqdm
 
 
 def v7labstobasicjson(infile: str, outfile: str=None) -> dict:

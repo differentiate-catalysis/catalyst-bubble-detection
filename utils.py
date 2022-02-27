@@ -5,7 +5,7 @@ import pickle
 from math import ceil
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Iterable
 
 import numpy as np
 import skimage.draw
@@ -14,11 +14,12 @@ import torch.distributed
 import torch.utils.data
 import torchvision
 from PIL import Image
+from ray import tune
 from torch.nn.modules.module import Module
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.transforms.functional import pil_to_tensor, to_pil_image
-from tqdm import tqdm
+from tqdm import tqdm as tqdm_wrapper
 
 from transforms import Compose, ToTensor, transform_mappings
 
@@ -276,3 +277,8 @@ def get_circle_coords(center_y: float, center_x: float, rad_y: float, rad_x: flo
     cc = cc[cc >= 0]
     return rr, cc
 
+
+def tqdm(iterable: Iterable, **kwargs):
+    if tune.is_session_enabled():
+        return iterable
+    return tqdm_wrapper(iterable, **kwargs)

@@ -12,11 +12,10 @@ from torch.nn import Module
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, Optimizer
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from evaluate import evaluate
 from models import model_mappings
-from utils import get_dataloaders, warmup_lr_scheduler
+from utils import get_dataloaders, tqdm, warmup_lr_scheduler
 
 
 def train_model(gpu: int, args: SimpleNamespace):
@@ -139,7 +138,7 @@ def train_model(gpu: int, args: SimpleNamespace):
 
             tune.report(loss=loss_eval, iou=iou_eval, map=mAP_eval)
             with args.ray_checkpoint_dir(step=epoch) as checkpoint_dir:
-                model_dir = os.path.join(checkpoint_dir, 'best.pth')
+                model_dir = os.path.join(checkpoint_dir, os.pardir, 'last.pth')
 
         # Checkpoint if good result, only checkpoint on one rank
         if (iou_eval > iou_max or tune.is_session_enabled()) and (rank == None or rank == 0):

@@ -6,18 +6,15 @@ import numpy as np
 import torch
 import torch.utils.data
 import torchvision
-from ray import tune
 from torch.nn import Module
 from torch.utils.data import DataLoader
 from torchvision.transforms import functional as F
-from tqdm import tqdm
 
 from coco_eval import CocoEvaluator
 from coco_utils import get_coco_api_from_dataset
 from models import model_mappings
-from utils import Dataset, VideoDataset, collate_fn
+from utils import Dataset, VideoDataset, collate_fn, get_circle_coords, tqdm
 from visualize import label_image, label_volume
-from utils import get_circle_coords
 
 
 def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: Optional[str] = None, test: bool = False, apply: bool = True, metrics: bool = True) -> Tuple[float, float, float]:

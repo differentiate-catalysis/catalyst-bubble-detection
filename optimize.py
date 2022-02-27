@@ -138,8 +138,6 @@ def optimize(args):
             resume=args.resume,
     )
     best_trial = result.get_best_trial('map', 'max', 'last')
-    df = result.dataframe(metric='map', mode='max')
-    df.to_csv(os.path.join(name_dir, 'trials.csv'))
     if best_trial is not None:
         print('Best trial config: {}'.format(best_trial.config))
         print('Best trial final validation loss: {}'.format(
@@ -148,14 +146,8 @@ def optimize(args):
             best_trial.last_result['map']))
         print('Best trial final validation iou: {}'.format(
             best_trial.last_result['iou']))
-        print('Best Checkpoint Dir: ' + str(best_trial.checkpoint.value))
-        checkpoint = [file for file in os.listdir(best_trial.checkpoint.value) if 'best.pth' in file]
-        if len(checkpoint) > 0:
-            checkpoint = checkpoint[0]
-        else:
-            raise RuntimeError('No valid checkpoint found. Trial likely did not complete properly')
-
-        checkpoint = torch.load(os.path.join(best_trial.checkpoint.value, checkpoint))
+        # print('Best Checkpoint Dir: ' + str(best_trial.checkpoint.value))
+        checkpoint = torch.load(os.path.join(best_trial.checkpoint.value, os.pardir, 'last.pth'))
         torch.save({
                     'epoch': best_trial.config['epoch'],
                     'version': best_trial.config['epoch'],
@@ -164,7 +156,7 @@ def optimize(args):
                 }, os.path.join(name_dir, 'best.pth')
         )
         config_out = best_trial.config.copy()
-        config_out['root'] = args.root#'data/HandSeg_Reserved'
+        config_out['root'] = args.root
         config_out['mp'] = args.mp
         config_out['gpu'] = args.gpu
         config_out['amp'] = args.amp
@@ -174,3 +166,5 @@ def optimize(args):
         config_out['test_dir'] = 'test'
         with open(os.path.join(name_dir, 'best.json'), 'w') as f:
             json.dump(config_out, f, indent=4)
+        df = result.dataframe(metric='map', mode='max')
+        df.to_csv(os.path.join(name_dir, 'trials.csv'))

@@ -9,9 +9,8 @@ import numpy as np
 import torchvision.transforms as T
 from PIL import Image
 from torchvision.transforms.functional import pil_to_tensor
-from tqdm import tqdm
 
-from utils import get_circle_coords
+from utils import get_circle_coords, tqdm
 
 
 def polar(r: float, theta: float, width: int, height: int) -> Tuple[int, int]:

@@ -159,7 +159,9 @@ def train_model(gpu: int, args: SimpleNamespace):
             }, model_dir)
 
         if args.graph:
-            graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
+            if not os.path.isdir(os.path.join(args.save, 'plots')):
+                os.mkdir(os.path.join(args.save, 'plots'))
+            graph(loss_train_list, loss_val_list, os.path.join(args.save, 'plots', '%s.png' %(args.name)))
 
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> float:
@@ -208,6 +210,8 @@ def graph(loss_train_list, loss_val_list, save_path):
     x = range(len(loss_train_list))
     ax.plot(x, loss_train_list, label='Training Loss')
     ax.plot(x, loss_val_list, label='Validation Loss')
+    ax.set_xlim(0, len(loss_train_list) - 1)
+    plt.xticks(range(len(loss_train_list)))
     ax.set(xlabel='Epoch', ylabel='Loss',
            title='Loss of Model')
     plt.legend(loc="upper left")

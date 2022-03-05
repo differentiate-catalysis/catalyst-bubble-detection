@@ -13,8 +13,10 @@ import math
 import os
 
 video_name = "IrO2_DSC_0106"
+dest_folder = "./still_data"
+source_video_path = "/Users/aristanascourtas/Documents/Work/bubble misc/Test Videos-2-28-2022/DSC_0106.MOV"
 
-cam = cv2.VideoCapture("/Users/aristanascourtas/Documents/Work/bubble misc/Test Videos-2-28-2022/DSC_0106.MOV")
+cam = cv2.VideoCapture(source_video_path)
 # frame
 currentframe = 0
 
@@ -30,8 +32,8 @@ n_frame_to_grab = save_rate * math.ceil(fps)
 
 try:
     # create a local folder to save the data
-    if not os.path.exists('still_data'):
-        os.makedirs('still_data')
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
 except OSError:
     print('Error: Creating directory of data')
 
@@ -43,13 +45,14 @@ while True:
 
     # only grab every nth frame
     if currentframe % n_frame_to_grab == 0.0:
+        # if video is still left continue writing images
         if ret:
-            # if video is still left continue creating images
-            name = './still_data/' + video_name + "_" + str(timestamp) + '.jpg'
-            print('Creating...' + name)
+            filename = f"{video_name}_{str(timestamp)}.jpg"
+            dest_path = os.path.join(dest_folder, filename)
+            print('Writing ' + dest_path)
 
-            # writing the extracted images
-            cv2.imwrite(name, frame)
+            # write the extracted images to disk
+            cv2.imwrite(dest_path, frame)
         else:
             break
     currentframe += 1

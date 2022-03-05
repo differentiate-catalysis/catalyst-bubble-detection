@@ -1,7 +1,7 @@
 """ grab_stills.py
 
-Utility script to grab still images from videos, labeling them with timestamps.
-Intended for grabbing stills from catalysis images for labeling (ie annotating) for training.
+Utility script to grab still images from videos, labeling them with timestamps in microseconds.
+Intended for grabbing stills from catalysis images for labeling (ie annotating).
 
 Code snippets borrowed from https://www.geeksforgeeks.org/extract-images-from-video-in-python/
 
@@ -18,18 +18,20 @@ cam = cv2.VideoCapture("/Users/aristanascourtas/Documents/Work/bubble misc/Test 
 # frame
 currentframe = 0
 
-# get video FPS (~60 fps)
+# get video FPS (e.g. ~60 fps)
 fps = cam.get(cv2.CAP_PROP_FPS)
 
-# grab a frame every nth second
-n_frame_to_grab = 30 * math.ceil(fps)
+# the seconds between frame saves
+save_rate = 30
+
+# calculate the number of n frames in each save_rate interval
+n_frame_to_grab = save_rate * math.ceil(fps)
+
 
 try:
-    # creating a folder named data
+    # create a local folder to save the data
     if not os.path.exists('still_data'):
         os.makedirs('still_data')
-
-# if not created then raise error
 except OSError:
     print('Error: Creating directory of data')
 
@@ -50,12 +52,8 @@ while True:
             cv2.imwrite(name, frame)
         else:
             break
-    # increasing counter so that it will
-    # show how many frames are created
     currentframe += 1
 
 # Release all space and windows once done
 cam.release()
 cv2.destroyAllWindows()
-
-

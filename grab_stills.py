@@ -12,12 +12,19 @@ import cv2
 import math
 import os
 
-SAVING_FPS = 0.1  # this would be one still every 10s
+video_name = "IrO2_DSC_0106"
 
 cam = cv2.VideoCapture("/Users/aristanascourtas/Documents/Work/bubble misc/Test Videos-2-28-2022/DSC_0106.MOV")
+# frame
+currentframe = 0
+
+# get video FPS (~60 fps)
+fps = cam.get(cv2.CAP_PROP_FPS)
+
+# grab a frame every nth second
+n_frame_to_grab = 30 * math.ceil(fps)
 
 try:
-
     # creating a folder named data
     if not os.path.exists('still_data'):
         os.makedirs('still_data')
@@ -26,27 +33,17 @@ try:
 except OSError:
     print('Error: Creating directory of data')
 
-# frame
-currentframe = 0
-
-
-# get video FPS (~60 fps)
-fps = cam.get(cv2.CAP_PROP_FPS)
-
-# grab a frame every nth second
-n_frame_to_grab = 30 * math.ceil(fps)
-
-
-while(True):
+while True:
     # reading from frame
     ret, frame = cam.read()
+    # timestamp, in microseconds, rounded to avoid periods in filename
+    timestamp = round(cam.get(cv2.CAP_PROP_POS_MSEC) * 1000)
 
     # only grab every nth frame
     if currentframe % n_frame_to_grab == 0.0:
         if ret:
-
             # if video is still left continue creating images
-            name = './still_data/frame' + str(currentframe) + '.jpg'
+            name = './still_data/' + video_name + "_" + str(timestamp) + '.jpg'
             print('Creating...' + name)
 
             # writing the extracted images

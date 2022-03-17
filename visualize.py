@@ -4,6 +4,8 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 import pandas as pd
+import torch
+import torchvision
 
 
 def check_coalesce(center: List[int], radius: float, prev_circles: Dict, curr_circles: Dict, min_c: int = 10) -> bool:
@@ -133,7 +135,7 @@ def redraw_fig(frame: np.ndarray, bubble_dict: np.ndarray, color_dict: Dict = {'
     return edit_frame
 
 
-def label_image(image_file: str, npy_file: str, save_dir: str, bubble_color: Tuple[int, int, int] = (255,0,0), write_frame_csv: bool = False, save_image: bool = False) -> np.ndarray:
+def label_image(image_file: str, npy_file: str, save_dir: str, bubble_color: Tuple[int, int, int] = (255,0,0), write_frame_csv: bool = False, save_image: bool = False, label_file: Optional[str] = None) -> np.ndarray:
     '''
     Takes in an image file a npy file with bounding boxes, returns a single image with bubbles marked.
     Parameters
@@ -159,6 +161,12 @@ def label_image(image_file: str, npy_file: str, save_dir: str, bubble_color: Tup
     for i in ['new','coalesced','growing','shrinking','unchanged']: color_dict[i]=bubble_color
     full_frame = cv2.imread(image_file)
     curr_boxes = np.load(npy_file)
+    if label_file:
+        color_dict['new'] = (0, 255, 0)
+        color_dict['coalesced'] = (0, 255, 255)
+        color_dict['growing'] = (0, 0, 255)
+        curr_labels = np.load(label_file)
+        iou = torchvision.ops.box_iou(torch.from_numpy(curr_boxes), torch.from_numpy(curr_labels))
     curr_circles={} #Tracking dict for all bubbles in frame
     circle_counter = 0
     image_dir = os.path.join(save_dir, 'labeled_images')
@@ -166,6 +174,17 @@ def label_image(image_file: str, npy_file: str, save_dir: str, bubble_color: Tup
     os.makedirs(image_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
     for box in curr_boxes:
+        new = False
+        coalesced = False
+        if label_file:
+            target = torch.argmax(iou[circle_counter])
+            if iou[circle_counter, target] > 0.9:
+                iou[circle_counter, target] = 0
+                new = True
+            elif iou[circle_counter, target] > 0.75:
+                iou[circle_counter, target] = 0
+                coalesced = True
+
         curr_circles[circle_counter]={} #Tracking dict for current bubble
         center = [0.5*(box[0]+box[2]),0.5*(box[1]+box[3])] #Center averaging
         curr_circles[circle_counter]['center'] = center
@@ -174,11 +193,26 @@ def label_image(image_file: str, npy_file: str, save_dir: str, bubble_color: Tup
         radius = 0.5*(abs(box[0]-center[0]) + abs(box[1]-center[1])) #Radius averaging
         curr_circles[circle_counter]['radius'] = radius
         curr_circles[circle_counter]['diameter'] = int(radius*2)
-        curr_circles[circle_counter]['volume_change']=None
-        curr_circles[circle_counter]['new']=True
-        curr_circles[circle_counter]['coalesced']=False
+        curr_circles[circle_counter]['volume_change']=60
+        curr_circles[circle_counter]['new']=new
+        curr_circles[circle_counter]['coalesced']=coalesced
         curr_circles[circle_counter]['id']=circle_counter
         circle_counter+=1
+    # if label_file:
+        # for box in curr_labels:
+            # curr_circles[circle_counter]={} #Tracking dict for current bubble
+            # center = [0.5*(box[0]+box[2]),0.5*(box[1]+box[3])] #Center averaging
+            # curr_circles[circle_counter]['center'] = center
+            # curr_circles[circle_counter]['center_x'] = int(center[0])
+            # curr_circles[circle_counter]['center_y'] = int(center[1])
+            # radius = 0.5*(abs(box[0]-center[0]) + abs(box[1]-center[1])) #Radius averaging
+            # curr_circles[circle_counter]['radius'] = radius
+            # curr_circles[circle_counter]['diameter'] = int(radius*2)
+            # curr_circles[circle_counter]['volume_change']=60
+            # curr_circles[circle_counter]['new']=False
+            # curr_circles[circle_counter]['coalesced']=True
+            # curr_circles[circle_counter]['id']=circle_counter
+            # circle_counter+=1
     if write_frame_csv:
         curr_df = pd.DataFrame.from_dict(curr_circles).T.drop(columns=['center',\
                                                     'radius']).sort_values(by='id')

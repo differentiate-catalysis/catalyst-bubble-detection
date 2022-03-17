@@ -1,3 +1,4 @@
+import time
 import argparse
 import json
 import os
@@ -21,7 +22,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.transforms.functional import pil_to_tensor, to_pil_image
 from tqdm import tqdm as tqdm_wrapper
 
-from transforms import Compose, ToTensor, transform_mappings
+from transforms import AutoExpose, Compose, ToTensor, transform_mappings
 
 
 def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
@@ -79,6 +80,7 @@ def compute_mean_and_std_video(data_root: str, video_file: str, image_size: Tupl
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
+    composition.append(AutoExpose())
     if training and transforms:
         for transform in transforms:
             if transform in transform_mappings:
@@ -123,8 +125,10 @@ class Dataset(torch.utils.data.Dataset):
             target['masks'] = mask
             target['image_id'] = torch.tensor([index])
             # Augment the image and target
-
+            start = time.time()
             image, target = self.transform(image, target)
+            end = time.time()
+            # print('Augmenting took %0.4f ms' % ((end - start)*1000))
         return image, target
 
     def __len__(self):

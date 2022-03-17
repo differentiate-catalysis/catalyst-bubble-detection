@@ -5,6 +5,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 from torch.nn import Module
+from skimage import exposure
 
 
 class Compose(Module):
@@ -189,7 +190,17 @@ class Normalize(T.Normalize):
         return image, target
 
 
+class AutoExpose(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image_np = image.numpy()
+        for c in range(image_np.shape[0]):
+            image_np[c] = exposure.adjust_log(image_np[c], 1)
+        image = torch.from_numpy(image_np)
+        return image, target
+
+
 transform_mappings = {
+    'auto_expose': AutoExpose(),
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),

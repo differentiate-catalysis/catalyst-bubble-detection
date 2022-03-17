@@ -87,7 +87,11 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
                             scores_cpu = coco_output['scores'].cpu().numpy()
                             np.save(os.path.join(save_dir, 'scores', this_image), scores_cpu)
                         if write_image:
-                            label_image(os.path.join(valid_loader.dataset.patch_root, this_image), os.path.join(save_dir, 'boxes', this_image + '.npy'), save_dir, save_image=True)
+                            if has_target:
+                                label_file = os.path.join(valid_loader.dataset.target_root, this_image[:-4] + '_boxes.npy')
+                            else:
+                                label_file = None
+                            label_image(os.path.join(valid_loader.dataset.patch_root, this_image), os.path.join(save_dir, 'boxes', this_image + '.npy'), save_dir, save_image=True, label_file=label_file)
         # Finish pyCocoTools evaluation
         if has_target and not test:
             mAP, iou = get_metrics(output_list, target_list, valid_loader.dataset)

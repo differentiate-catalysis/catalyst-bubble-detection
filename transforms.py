@@ -190,7 +190,7 @@ class Normalize(T.Normalize):
         return image, target
 
 
-class AutoExpose(Module):
+class LogGamma(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image_np = image.numpy()
         for c in range(image_np.shape[0]):
@@ -199,8 +199,17 @@ class AutoExpose(Module):
         return image, target
 
 
+class CLAHE(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image_np = image.permute((1, 2, 0)).numpy()
+        image_np = exposure.equalize_adapthist(image_np)
+        image = torch.from_numpy(image_np).permute((2, 0, 1))
+        return image, target
+
+
 transform_mappings = {
-    'auto_expose': AutoExpose(),
+    'auto_expose': LogGamma(),
+    'clahe': CLAHE(),
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),

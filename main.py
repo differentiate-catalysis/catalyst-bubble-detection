@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import torch.multiprocessing as mp
 
-from conversions import gen_label_images, gen_targets
+from conversions import gen_label_images, gen_targets, apply_transforms
 from evaluate import run_apply, run_metrics
 from MatCNN.evaluate import run_apply as mat_run_apply
 from MatCNN.evaluate import run_metrics as mat_run_metrics
@@ -39,6 +39,9 @@ def main(args: SimpleNamespace):
         shutil.unpack_archive(data_dir + '.tar', extract_dir = args.root)
     if 'gen_labels' in modes:
         gen_label_images(os.path.join(args.root, args.json_dir), os.path.join(args.root, 'labels'))
+        valid_mode = True
+    if 'augment' in modes:
+        apply_transforms(args)
         valid_mode = True
     if 'image2npy' in modes:
         convert_dir(args)
@@ -178,6 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--stats_file', type=str, help='JSON file to read stats from')
     parser.add_argument('--video', type=str, help='Video file to perform inference on')
     parser.add_argument('--simclr_checkpoint', type=str, help='Weights for SimCLR pre-trained ResNet')
+    parser.add_argument('--augment_out', type=str, help='Output directory for augment mode')
 
     args = parser.parse_args()
     defaults = {
@@ -253,6 +257,7 @@ if __name__ == '__main__':
         'stats_file': None,
         'video': None,
         'simclr_checkpoint': None,
+        'augment_out': 'data/augment'
     }
     if args.config:
         if os.path.isfile(args.config):

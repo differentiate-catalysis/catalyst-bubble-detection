@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.transforms.functional import pil_to_tensor, to_pil_image
 from tqdm import tqdm as tqdm_wrapper
 
-from transforms import AutoExpose, Compose, ToTensor, transform_mappings
+from transforms import Compose, ToTensor, transform_mappings
 
 
 def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:

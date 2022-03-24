@@ -11,9 +11,10 @@ from parsl import python_app
 from parsl.config import Config
 from parsl.executors.threads import ThreadPoolExecutor
 from PIL import Image, ImageDraw
+import cv2
 
 from transforms import target_from_masks
-from utils import get_circle_coords, tqdm
+from utils import get_circle_coords, tqdm, get_transforms
 
 
 def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
@@ -215,3 +216,16 @@ def gen_targets(args):
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()
+
+def apply_transforms(args):
+    transform_compose = get_transforms(True, args.transforms)
+    images = [os.path.join(args.root, f) for f in os.listdir(args.root) if os.path.isfile(os.path.join(args.root, f))]
+    for image_file in tqdm(images):
+        image = Image.open(image_file).convert(mode='RGB')
+        image, _ = transform_compose(image)
+        image = image.numpy()
+        image = np.transpose(image, (1, 2, 0))
+        if not os.path.isdir(args.augment_out):
+            os.makedirs(args.augment_out)
+        image *= 255
+        cv2.imwrite(os.path.join(args.augment_out, os.path.basename(image_file)), image)

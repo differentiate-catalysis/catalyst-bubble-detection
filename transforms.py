@@ -1,11 +1,12 @@
 import math
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
-from torch.nn import Module
 from skimage import exposure
+from torch.nn import Module
 
 
 class Compose(Module):
@@ -206,10 +207,18 @@ class CLAHE(Module):
         image = torch.from_numpy(image_np).permute((2, 0, 1))
         return image, target
 
+class ContrastStretch(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image_np = image.permute((1, 2, 0)).numpy()
+        p2, p98 = np.percentile(image_np, (2, 98))
+        image_np = exposure.rescale_intensity(image_np, in_range=(p2, p98))
+        image = torch.from_numpy(image_np).permute((2, 0, 1))
+        return image, target
 
 transform_mappings = {
-    'auto_expose': LogGamma(),
+    'log_gamma': LogGamma(),
     'clahe': CLAHE(),
+    'contrast_stretch': ContrastStretch(),
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),

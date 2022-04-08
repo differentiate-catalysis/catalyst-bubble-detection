@@ -1,6 +1,7 @@
 import math
 import os
 from types import SimpleNamespace
+from typing import List
 
 import matplotlib.pyplot as plt
 import ray
@@ -19,6 +20,16 @@ from utils import get_dataloaders, tqdm, warmup_lr_scheduler
 
 
 def train_model(gpu: int, args: SimpleNamespace):
+    '''
+    General training function for models. Handles initializing necessary objects,
+    tracking metrics, and calling train and evaluation loops.
+    Parameters
+    ----------
+    gpu: int
+        CUDA ordinal for what GPU to run on
+    args: SimpleNamespace
+        Namespace of all options/hyperparameters
+    '''
     loss_train_list = []
     loss_val_list = []
     if args.mp:
@@ -165,6 +176,23 @@ def train_model(gpu: int, args: SimpleNamespace):
 
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> float:
+    '''
+    Train loop for models.
+    Parameters
+    ----------
+    model: Module
+        A torchvision compatible object detector, such as Faster-RCNN or Mask-RCNN.
+    optimizer: Optimizer
+        A PyTorch optimizer with the model parameters.
+    train_loader: DataLoader
+        Dataloader for the training data
+    epoch: int
+        Current training epoch
+    amp: bool
+        Whether or not to use Accelerated Mixed Precision - lowers memory requirements
+    gpu: int
+        CUDA ordinal for which GPU to run on
+    '''
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -205,7 +233,18 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
 
     return total_loss / num_samples
 
-def graph(loss_train_list, loss_val_list, save_path):
+def graph(loss_train_list: List, loss_val_list: List, save_path: str):
+    '''
+    Graphs the train and validation loss, writes it to a file.
+    Parameters
+    ----------
+    loss_train_list: List
+        List containing the loss at each epoch during training
+    loss_val_list: List
+        List containing the loss during validation at the end of each epoch
+    save_path: str
+        Path to the file to write the graph to
+    '''
     fig, ax = plt.subplots()
     x = range(len(loss_train_list))
     ax.plot(x, loss_train_list, label='Training Loss')

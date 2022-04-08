@@ -1,5 +1,6 @@
 import math
 import os
+from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -18,6 +19,33 @@ from visualize import label_image, label_volume
 
 
 def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_dir: Optional[str] = None, test: bool = False, apply: bool = True, metrics: bool = True) -> Tuple[float, float, float]:
+    '''
+    Validation/testing loop. Calculates metrics, and if testing, will write out boxes, masks, and scores.
+    Parameters
+    ----------
+    model: Module
+        A torchvision compatible object detector, such as Faster-RCNN or Mask-RCNN
+    valid_loader: DataLoader
+        A dataloader for the validation or testing data. Does not necessarily require labels.
+    amp: bool
+        Whether or not to use Accelerated Mixed Precision - lowers memory requirements
+    gpu: int
+        CUDA ordinal for which GPU to run one
+    save_dir: str
+        Where to write out saved files. Subdirectories will be created for boxes, masks, and scores
+    test: bool
+        Whether or not this is a testing run, requiring the saving of files
+    apply: bool
+        Currently unused.
+    metrics: bool
+        Currently unused.
+    Returns
+    -------
+    loss, iou, mAP: float
+        Scores for each metric, if the dataset has labels and is test is set to false (usually for validation)
+    loss: float
+        Loss, if test is active
+    '''
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -102,6 +130,22 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
 
 
 def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> Tuple[float, float]:
+    '''
+    Calculate metrics (mAP, IoU) for the model outputs using pyCocoTools for mAP and by matches boxes
+    for the IoU.
+    Parameters
+    ----------
+    outputs: List
+        List of predicted dictionaries for each image, containing the bounding boxes, masks, etc.
+    targets: List
+        List of target dictionaries (labels) for each image, containing the same keys as outputs
+    dataset: Dataset
+        A COCO formatted dataset
+    Returns
+    -------
+    mAP, iou: float
+        Scores for the model performance
+    '''
     coco = get_coco_api_from_dataset(dataset)
     iou_types = ['bbox']
     coco_evaluator = CocoEvaluator(coco, iou_types)
@@ -149,6 +193,18 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
 
 
 def process_masks(output: Dict[str, torch.Tensor], iou_threshold: float = 0.8) -> Dict[str, torch.Tensor]:
+    '''
+    Post-processing for object segmentation models. Throws out bounding boxes that do not agree with their masks.
+    Parameters:
+    output: Dict
+        A dictionary for the prediction on a given image
+    iou_threshold: float
+        The minimum IoU required for a bounding box's inscribed circle and mask to "agree"
+    Returns
+    -------
+    output: Dict
+        The input 'output' dict with disagreeing annotations removed
+    '''
     indices = []
     for i, (box, mask) in enumerate(zip(output['boxes'], output['masks'])):
         mask = mask[0] >= 0.5
@@ -174,6 +230,17 @@ def process_masks(output: Dict[str, torch.Tensor], iou_threshold: float = 0.8) -
 
 
 def remove_concetric_circles(output: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    '''
+    Vectorized helper method to remove concentric boxes.
+    Parameters
+    ----------
+    output: Dict
+        The predicted dictionary for a given image
+    Returns
+    -------
+    output: Dict
+        The input with concentric boxes thrown out
+    '''
     boxes = output['boxes']
     # X, Y, R
     circle_coords = torch.zeros((boxes.shape[0], 3), device=boxes.device, dtype=torch.float32)
@@ -205,7 +272,19 @@ def remove_concetric_circles(output: Dict[str, torch.Tensor]) -> Dict[str, torch
     return output
 
 
-def run_apply(args):
+def run_apply(args: SimpleNamespace) -> Optional[float]:
+    '''
+    Main method for running inference without testing.
+    Parameters
+    ----------
+    args: SimpleNamespace
+        Namespace containing all options and hyperparameters
+    Returns
+    -------
+    loss: float
+        The loss obtained through evaluation, if labels exist.
+
+    '''
     if args.video:
         test_dir = os.path.join(os.path.join(args.root, args.name, args.test_dir))
         os.makedirs(os.path.join(test_dir, 'patches'), exist_ok=True)
@@ -251,7 +330,20 @@ def run_apply(args):
     return loss
 
 
-def run_metrics(args, loss=None):
+def run_metrics(args: SimpleNamespace, loss: Optional[float] = None):
+    '''
+    Main method for calculating metrics other than loss on given outputs, writes to a file.
+    Parameters
+    ----------
+    args: SimpleNamespace
+        Namespace containing all options and hyperparameters
+    loss: float
+        Loss calculated from apply, if it exists.
+    Returns
+    -------
+    loss, iou, mAP
+        Scores for model performance
+    '''
     test_dir = os.path.join(args.root, args.name, args.test_dir)
     save_dir = '%s/predictions/%s' % (test_dir, args.name)
     output_list = []

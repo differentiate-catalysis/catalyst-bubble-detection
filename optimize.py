@@ -22,6 +22,22 @@ from utils import gen_args
 
 
 def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None, args_space: SimpleNamespace = None, dir: str = None):
+    '''
+    Wrapper function for training an HPO model. Sets the trial's hyperparameters with the defaults
+    and runs on the assigned GPU.
+    Parameters
+    ----------
+    config: Dict
+        Dictionary of hyperparameters given by ray
+    checkpoint_dir: str
+        Checkpoint of a saved trial given by ray
+    defaults: Dict
+        Set of default options/hyperparameters
+    args_space: SimpleNamespace
+        Namespace of arguments to copy from
+    dir: str
+        Working directory for the trial. Ray sometimes sets this wrong, so manually set it here
+    '''
     if dir:
         os.chdir(dir)
     if defaults is None:
@@ -47,19 +63,19 @@ def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None,
 
 
 def pick_model(args: SimpleNamespace):
-    if not set(args.sampling_models).issubset(set(model_keys)):
+    if not set(args.sampling_models_hpo).issubset(set(model_keys)):
         raise ValueError('Sampling models contain invalid values')
     def f(spec):
-        model = random.choice(args.sampling_models)
+        model = random.choice(args.sampling_models_hpo)
         return model.lower()
     return f
 
 
 def pick_optimizer(args: SimpleNamespace):
-    if not set(args.optimizers).issubset(set(['adam', 'adamw', 'sgd'])):
+    if not set(args.optimizers_hpo).issubset(set(['adam', 'adamw', 'sgd'])):
         raise ValueError('Optimizers to sample from contain invalid values')
     def f(spec):
-        return random.choice(args.optimizers)
+        return random.choice(args.optimizers_hpo)
     return f
 
 
@@ -73,35 +89,43 @@ def pick_transforms(args: SimpleNamespace):
 
 def pick_batch_size(args: SimpleNamespace):
     def f(spec):
-        max_exp = int(math.log(args.max_batch_size, 2))
-        min_exp = int(math.log(args.min_batch_size, 2))
+        max_exp = int(math.log(args.max_batch_size_hpo, 2))
+        min_exp = int(math.log(args.min_batch_size_hpo, 2))
         exp = nprd.randint(min_exp, max_exp + 1)
         return 2 ** exp
     return f
 
 
 def pick_patch_size(args: SimpleNamespace):
-    if args.min_patch_size > args.max_patch_size:
+    if args.min_patch_size_hpo > args.max_patch_size_hpo:
         raise ValueError('Min patch size is larger than max patch size')
     def f(spec):
-        return nprd.randint(args.min_patch_size, args.max_patch_size + 1)
+        return nprd.randint(args.min_patch_size_hpo, args.max_patch_size_hpo + 1)
     return f
 
 
-def optimize(args):
+def optimize(args: SimpleNamespace):
+    '''
+    Primary function for running HPO. Utilizes ASHA to optimize hyperparameters, writes out
+    best config and weights to args.save/args.name
+    Paramters
+    ---------
+    args: SimpleNamespace
+        Namespace of HPO and training options
+    '''
     if len(args.root) > 0 and args.root[0] != '/':
         args.root = os.path.join(os.getcwd(), args.root)
     name_dir = os.path.join('saved', args.name)
     hyperparam_config = {
         'model': tune.sample_from(pick_model(args)),
         'opt': tune.sample_from(pick_optimizer(args)),
-        'lr': tune.loguniform(args.min_lr, args.max_lr),
-        'momentum': tune.uniform(args.min_momentum, args.max_momentum),
-        'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs, args.max_epochs+1)),
+        'lr': tune.loguniform(args.min_lr_hpo, args.max_lr_hpo),
+        'momentum': tune.uniform(args.min_momentum_hpo, args.max_momentum_hpo),
+        'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs_hpo, args.max_epochs_hpo+1)),
         'patch_size': tune.sample_from(pick_patch_size(args)),
         'batch_size': tune.sample_from(pick_batch_size(args)),
         'transforms': tune.sample_from(pick_transforms(args)),
-        'gamma': tune.loguniform(args.min_gamma, args.max_gamma),
+        'gamma': tune.loguniform(args.min_gamma_hpo, args.max_gamma_hpo),
     }
     if not os.path.isdir(name_dir):
         os.mkdir(name_dir)
@@ -132,10 +156,10 @@ def optimize(args):
             resources_per_trial = trial_resources,
             config = hyperparam_config,
             local_dir = 'saved/tune',
-            num_samples = args.num_samples,
+            num_samples = args.num_samples_hpo,
             scheduler = scheduler,
             progress_reporter = reporter,
-            resume=args.resume,
+            resume=args.resume_hpo,
     )
     best_trial = result.get_best_trial('map', 'max', 'last')
     if best_trial is not None:

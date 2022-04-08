@@ -111,7 +111,6 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=str, help='Root directory for the dataset')
     parser.add_argument('--lr', type=float, help='Learning rate for the optimizer')
     parser.add_argument('--batch_size', type=int, help='Batch size')
-    parser.add_argument('--epochs', type=int, help='Number of epochs to train for', dest='epoch')
     parser.add_argument('--epoch', type=int, help='Number of epochs to train for')
     parser.add_argument('--gpu', type=int, help='Device ordinal for CUDA GPU')
     parser.add_argument('--amp', action='store_true', help='Use mixed precision')
@@ -119,8 +118,8 @@ if __name__ == '__main__':
     parser.add_argument('--momentum', type=float, help='Momentum for SGD')
     parser.add_argument('--aug', help='Whether or not to augment inputs', action='store_true')
     parser.add_argument('--test_dir', type=str, help='Directory to test model on')
-    parser.add_argument('--save', type=str, help='File name of saving destination')
-    parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Available modes include \'train\'')
+    parser.add_argument('--save', type=str, help='Directory to write saved model weights to. Subdirectories will be created for HPO runs')
+    parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Available modes include \'train\', \'apply\', \'evaluate\', and \'optimize\'')
     parser.add_argument('--mp', action='store_true', help='Whether or not to use multiprocessing')
     parser.add_argument('--nodes', type=int, help='Number of nodes for multiprocessing')
     parser.add_argument('--nr', type=int, help='Index of the current node\'s first rank')
@@ -131,23 +130,23 @@ if __name__ == '__main__':
     parser.add_argument('--num_images', type=int, help='Number of images to train on')
     parser.add_argument('--checkpoint', type=str, help='Directory to a pth file to load')
     parser.add_argument('--no-prompt', dest='prompt', action='store_false', help='Skip prompt for checkpoint loading')
-    parser.add_argument('--sampling_models', type=str, nargs='+', help='Models to sample from in HPO')
-    parser.add_argument('--min_lr', type=float, help='Minimum learning rate for HPO')
-    parser.add_argument('--max_lr', type=float, help='Maximum learning rate for HPO')
-    parser.add_argument('--min_epochs', type=int, help='Minimum number of epochs for HPO')
-    parser.add_argument('--max_epochs', type=int, help='Maximum number of epochs for HPO')
-    parser.add_argument('--min_momentum', type=float, help='Minimum momentum for HPO')
-    parser.add_argument('--max_momentum', type=float, help='Maximum momentum for HPO')
-    parser.add_argument('--max_patch_size', type=int, help='Maximum patch size for HPO')
-    parser.add_argument('--min_patch_size', type=int, help='Minimum patch size for HPO')
-    parser.add_argument('--max_batch_size', type=int, help='Maximum batch size for HPO')
-    parser.add_argument('--min_batch_size', type=int, help='Minimum batch size for HPO')
-    parser.add_argument('--max_gamma', type=float, help='Max gamma value for HPO')
-    parser.add_argument('--min_gamma', type=float, help='Min gamma value for HPO')
-    parser.add_argument('--num_samples', type=int, help='Number of trials to run for HPO')
-    parser.add_argument('--optimizers', type=str, nargs='+', help='Optimizers to sample from in HPO')
-    parser.add_argument('--resume', action='store_true', help='Whether or not to resume an HPO trial')
-    parser.add_argument('--jobs', type=int, help='Number of processes to run')
+    parser.add_argument('--sampling_models_hpo', type=str, nargs='+', help='Models to sample from in HPO')
+    parser.add_argument('--min_lr_hpo', type=float, help='Minimum learning rate for HPO')
+    parser.add_argument('--max_lr_hpo', type=float, help='Maximum learning rate for HPO')
+    parser.add_argument('--min_epochs_hpo', type=int, help='Minimum number of epochs for HPO')
+    parser.add_argument('--max_epochs_hpo', type=int, help='Maximum number of epochs for HPO')
+    parser.add_argument('--min_momentum_hpo', type=float, help='Minimum momentum for HPO')
+    parser.add_argument('--max_momentum_hpo', type=float, help='Maximum momentum for HPO')
+    parser.add_argument('--max_patch_size_hpo', type=int, help='Maximum patch size for HPO')
+    parser.add_argument('--min_patch_size_hpo', type=int, help='Minimum patch size for HPO')
+    parser.add_argument('--max_batch_size_hpo', type=int, help='Maximum batch size for HPO')
+    parser.add_argument('--min_batch_size_hpo', type=int, help='Minimum batch size for HPO')
+    parser.add_argument('--max_gamma_hpo', type=float, help='Max gamma value for HPO')
+    parser.add_argument('--min_gamma_hpo', type=float, help='Min gamma value for HPO')
+    parser.add_argument('--num_samples_hpo', type=int, help='Number of trials to run for HPO')
+    parser.add_argument('--optimizers_hpo', type=str, nargs='+', help='Optimizers to sample from in HPO')
+    parser.add_argument('--resume_hpo', action='store_true', help='Whether or not to resume an HPO trial')
+    parser.add_argument('--jobs', type=int, help='Number of cores to use for parsl and dataloader workers')
     parser.add_argument('--name', type=str, help='Name of the model')
     parser.add_argument('--graph', action='store_true', help='Whether or not to save a plot of the results')
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
@@ -164,10 +163,10 @@ if __name__ == '__main__':
     parser.add_argument('--patching_mode', type=str, help="Mode with which to patch images. Either \"grid\" or \"random\"")
     parser.add_argument('--clear_predictions', action='store_true', help='Clear prediction patches during evaluate')
     parser.add_argument('--tar', action='store_true', help='Tar output when done')
-    parser.add_argument('--sampling_slices', type=int, nargs='+', help='Numbers of slices to use for models in HPO')
-    parser.add_argument('--sampling_patching_modes', type=str, nargs='+', help='Patching modes to sample with in HPO')
-    parser.add_argument('--min_overlap_size', type=int, help='Smallest size of overlap in HPO')
-    parser.add_argument('--max_overlap_size', type=int, help='Maximum size of overlap in HPO')
+    parser.add_argument('--sampling_slices_hpo', type=int, nargs='+', help='Numbers of slices to use for models in HPO')
+    parser.add_argument('--sampling_patching_modes_hpo', type=str, nargs='+', help='Patching modes to sample with in HPO')
+    parser.add_argument('--min_overlap_size_hpo', type=int, help='Smallest size of overlap in HPO')
+    parser.add_argument('--max_overlap_size_hpo', type=int, help='Maximum size of overlap in HPO')
     parser.add_argument('--mask', type=str, help='Mask to apply when getting metrics')
     parser.add_argument('--losses', type=str, nargs='+', help='Losses to sample from in HPO')
     parser.add_argument('--train_set', type=str, help='Dataset to use only as train')
@@ -206,22 +205,22 @@ if __name__ == '__main__':
         'num_images': -1,
         'prompt': True,
         'checkpoint': None,
-        'min_lr': 0.0000001,
-        'max_lr': 0.1,
-        'min_epochs': 5,
-        'max_epochs': 100,
-        'min_momentum': 0.7,
-        'max_momentum': 0.95,
-        'max_patch_size': 600,
-        'min_patch_size': 200,
-        'max_batch_size': 2,
-        'min_batch_size': 1,
-        'max_gamma': 0.01,
-        'min_gamma': 0.0000001,
+        'min_lr_hpo': 0.0000001,
+        'max_lr_hpo': 0.1,
+        'min_epochs_hpo': 5,
+        'max_epochs_hpo': 100,
+        'min_momentum_hpo': 0.7,
+        'max_momentum_hpo': 0.95,
+        'max_patch_size_hpo': 600,
+        'min_patch_size_hpo': 200,
+        'max_batch_size_hpo': 2,
+        'min_batch_size_hpo': 1,
+        'max_gamma_hpo': 0.01,
+        'min_gamma_hpo': 0.0000001,
         'num_samples': 100,
-        'sampling_models': ['mask_rcnn', 'faster_rcnn', 'retina_net'],
-        'optimizers': ['sgd', 'adam'],
-        'resume': False,
+        'sampling_models_hpo': ['mask_rcnn', 'faster_rcnn', 'retina_net'],
+        'optimizers_hpo': ['sgd', 'adam'],
+        'resume_hpo': False,
         'jobs': 4,
         'name': 'bubbles',
         'graph': False,
@@ -240,10 +239,10 @@ if __name__ == '__main__':
         'collect': False,
         'clear_predictions': False,
         'tar': True,
-        'sampling_slices': [4, 6, 8],
-        'sampling_patching_modes': ['grid'],
-        'min_overlap_size': 10,
-        'max_overlap_size': 30,
+        'sampling_slices_hpo': [4, 6, 8],
+        'sampling_patching_modes_hpo': ['grid'],
+        'min_overlap_size_hpo': 10,
+        'max_overlap_size_hpo': 30,
         'losses': ['cross_entropy'],
         'mask': None,
         'train_set': None,

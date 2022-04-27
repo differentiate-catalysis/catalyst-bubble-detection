@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 from types import SimpleNamespace
+from typing import List
 
 import torch.multiprocessing as mp
 
@@ -19,9 +20,10 @@ from models import model_keys as rcnn_models
 from optimize import optimize
 from train import train_model
 from utils import gen_args
+from arg_checks import check_args
 
 
-def main(args: SimpleNamespace):
+def main(args: SimpleNamespace, changed: List[str], explicit: List[str]):
     if not os.path.isdir('saved'):
         os.mkdir('saved')
     if not os.path.isdir('saved/log'):
@@ -32,6 +34,7 @@ def main(args: SimpleNamespace):
         args.mode = [args.mode]
     modes  = [mode.lower() for mode in args.mode]
     valid_mode = False
+    check_args(modes, changed, explicit)
     data_dir = os.path.join(args.root, args.name)
     if not os.path.isdir(args.run_dir):
         os.mkdir(args.run_dir)
@@ -238,7 +241,7 @@ if __name__ == '__main__':
         'patching_mode': 'grid',
         'collect': False,
         'clear_predictions': False,
-        'tar': True,
+        'tar': False,
         'sampling_slices_hpo': [4, 6, 8],
         'sampling_patching_modes_hpo': ['grid'],
         'min_overlap_size_hpo': 10,
@@ -273,6 +276,6 @@ if __name__ == '__main__':
         if config: #Start by subbing in from config file
             with open(config, 'r') as fp:
                 json_args = json.load(fp)
-        full_args = gen_args(args, full_args, file_args=json_args, config=config)
+        full_args, changed_args, explicit_args = gen_args(args, full_args, file_args=json_args, config=config)
         full_args.world_size = full_args.gpu * full_args.nodes
-        main(full_args)
+        main(full_args, changed_args, explicit_args)

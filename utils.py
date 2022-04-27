@@ -198,19 +198,24 @@ def warmup_lr_scheduler(optimizer: Optimizer, warmup_iters: int, warmup_factor: 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, f)
 
 
-def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> SimpleNamespace:
+def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> Tuple[SimpleNamespace, List[str], List[str]]:
     full_args = defaults.copy()
+    changed = []
+    explicit = []
     if file_args is not None:
         for key, value in file_args.items():
                 full_args[key] = value
+                changed.append(key)
     for key in full_args.keys(): #Sub in with direct from command args
         if hasattr(args, key) and getattr(args, key) is not None:
             new_attr = getattr(args, key)
             if type(new_attr) is not bool or new_attr is not defaults[key]:
                 full_args[key] = new_attr
+                changed.append(key)
+                explicit.append(key)
     if config:
         full_args['config'] = config
-    return SimpleNamespace(**full_args)
+    return SimpleNamespace(**full_args), changed, explicit
 
 
 def get_iou_types(model: Module):

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import List, Optional
 
 import torch
+from torch.nn import Module
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, maskrcnn_resnet50_fpn
 from torchvision.models.detection.backbone_utils import _validate_trainable_layers, BackboneWithFPN
 from torchvision.models.detection.faster_rcnn import FasterRCNN, FastRCNNPredictor
@@ -22,6 +23,9 @@ def resnet_fpn_backbone(
     returned_layers=None,
     extra_blocks=None
 ):
+    '''
+    Method copied from torchvision codebase. Used to instantiate as FPN Backbone from a ResNet. Specifically used for SimCLR.
+    '''
 
     # select layers that wont be frozen
     assert 0 <= trainable_layers <= 5
@@ -47,6 +51,19 @@ def resnet_fpn_backbone(
 
 
 def faster_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> FasterRCNN:
+    '''
+    Instantiates a COCO pre-trained FasterRCNN with 2 output classes, allowing for custom normalization constants.
+    Parameters
+    ----------
+    image_mean: Optiona[List[float]]
+        List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
+    image_std: Optional[List[float]]
+        List of 3 values from 0 to 1, describing the standard deviation R, G, and B values of images in the dataset
+    Returns
+    -------
+    model
+        The requested FasterRCNN model
+    '''
     model = fasterrcnn_resnet50_fpn(pretrained=True, image_mean=image_mean, image_std=image_std)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 2)
@@ -54,6 +71,19 @@ def faster_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[floa
 
 
 def mask_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> MaskRCNN:
+    '''
+    Instantiates a COCO pre-trained MaskRCNN with 2 output classes, allowing for custom normalization constants.
+    Parameters
+    ----------
+    image_mean: Optiona[List[float]]
+        List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
+    image_std: Optional[List[float]]
+        List of 3 values from 0 to 1, describing the standard deviation R, G, and B values of images in the dataset
+    Returns
+    -------
+    model
+        The requested MaskRCNN model
+    '''
     model = maskrcnn_resnet50_fpn(pretrained=True, image_mean=image_mean, image_std=image_std)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 2)
@@ -64,6 +94,19 @@ def mask_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]
 
 
 def retina_net(image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> RetinaNet:
+    '''
+    Instantiates a COCO pre-trained RetinaNet with 2 output classes, allowing for custom normalization constants.
+    Parameters
+    ----------
+    image_mean: Optiona[List[float]]
+        List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
+    image_std: Optional[List[float]]
+        List of 3 values from 0 to 1, describing the standard deviation R, G, and B values of images in the dataset
+    Returns
+    -------
+    model
+        The requested RetinaNet model
+    '''
     model = retinanet_resnet50_fpn(pretrained=True, image_mean=image_mean, image_std=image_std)
     in_features = model.head.classification_head.cls_logits.in_channels
     num_anchors = model.head.classification_head.num_anchors
@@ -72,6 +115,21 @@ def retina_net(image_mean: Optional[List[float]], image_std: Optional[List[float
 
 
 def simclr_faster_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]], checkpoint_path: str) -> FasterRCNN:
+    '''
+    Instantiates a SimCLR pre-trained FasterRCNN with 2 output classes, allowing for custom normalization constants.
+    Parameters
+    ----------
+    image_mean: Optiona[List[float]]
+        List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
+    image_std: Optional[List[float]]
+        List of 3 values from 0 to 1, describing the standard deviation R, G, and B values of images in the dataset
+    checkpoint_path: str
+        Path of SimCLR pre-trained FasterRCNN weights
+    Returns
+    -------
+    model
+        The requested FasterRCNN model
+    '''
     if checkpoint_path is None:
         return None
     resnet_backbone = resnet50(pretrained=True)
@@ -85,7 +143,18 @@ def simclr_faster_rcnn(image_mean: Optional[List[float]], image_std: Optional[Li
     return model
 
 
-def model_mappings(args: SimpleNamespace):
+def model_mappings(args: SimpleNamespace) -> Module:
+    '''
+    Given the arguments, instantiate the model with the correct normalization constants.
+    Parameters
+    ----------
+    args: SimpleNamespace
+        Namespace containing all options and hyperparameters
+    Returns
+    -------
+    model
+        The requested model based on args
+    '''
     if not args.imagenet_stats:
         if args.stats_file:
             stats = args.stats_file

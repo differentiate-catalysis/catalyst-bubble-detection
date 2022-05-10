@@ -48,6 +48,7 @@ def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None,
         defaults['model'] = 'unet'
     args = gen_args(args=SimpleNamespace(**config), defaults=defaults)
     args.jobs = args.jobs // args.gpu
+    args.data_workers = args.jobs
     if args.mp:
         args.ray_checkpoint_dir = distributed_checkpoint_dir
     else:
@@ -108,7 +109,7 @@ def optimize(args: SimpleNamespace):
     '''
     Primary function for running HPO. Utilizes ASHA to optimize hyperparameters, writes out
     best config and weights to args.save/args.name
-    Paramters
+    Parameters
     ---------
     args: SimpleNamespace
         Namespace of HPO and training options

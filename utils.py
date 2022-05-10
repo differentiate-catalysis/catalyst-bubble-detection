@@ -1,13 +1,14 @@
-import time
 import argparse
 import json
 import os
 import pickle
+import time
 from math import ceil
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Tuple, Union, Iterable
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
+import cv2
 import numpy as np
 import skimage.draw
 import torch
@@ -26,6 +27,19 @@ from transforms import Compose, ToTensor, transform_mappings
 
 
 def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
+    '''
+    Compute the means and standard deivations of each channel, writes to a stats file.
+    Parameters
+    ----------
+    split_paths: List[str]
+        List of paths to search for images under. Typically we'd search under train and validation.
+    image_size: Tuple[int, int]
+        Size of each image in pixels.
+    Returns
+    -------
+    means, std
+        Means and standard deivations of the dataset
+    '''
     images = []
     for split_path in split_paths:
         images.extend(list(Path(split_path).rglob('*.jpg')))
@@ -54,6 +68,21 @@ def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) ->
 
 
 def compute_mean_and_std_video(data_root: str, video_file: str, image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
+    '''
+    Compute the means and standard deivations of each channel, writes to a stats file.
+    Parameters
+    ----------
+    data_root: str
+        Where to write the stats file to
+    video_file: str
+        The video file to compute stats over
+    image_size: Tuple[int, int]
+        Size of each frame in pixels.
+    Returns
+    -------
+    means, std
+        Means and standard deivations of the dataset
+    '''
     dataset = VideoDataset(video_file)
     mean_tensor = torch.zeros((3, len(dataset)))
     std_tensor = torch.zeros((3, len(dataset)))
@@ -149,7 +178,7 @@ class VideoDataset(torch.utils.data.Dataset):
     def __init__(self, video_file: str):
         self.reader = torchvision.io.VideoReader(video_file)
         metadata = self.reader.get_metadata()
-        self.transform = get_transforms(False, [])
+        self.transform = get_transforms(True, ['clahe'])
         self.length = ceil(metadata['video']['duration'][0] * metadata['video']['fps'][0])
 
     def __getitem__(self, index):
@@ -170,13 +199,28 @@ def collate_fn(batch):
 
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
+    '''
+    Instantiates dataloaders for training and validation.
+    Parameters
+    ----------
+    args: SimpleNamespace
+        Namespace containing all options and hyperparameters
+    world_size: Optional[int]
+        If multiprocessing, set as number of nodes * number of GPUs. If not, set to None
+    rank: Optional[int]
+        If multiprocessing, set as the rank of the process. If not, set to None
+    Returns
+    -------
+    train_loader, valid_loader
+        Dataloaders for training and validation
+    '''
     training_data = Dataset(os.path.join(args.root, args.name, 'train'), args.transforms, True, num_images=args.num_images)
     print("Number of labels in training data: " + str(training_data.get_num_labels()))
     validation_data = Dataset(os.path.join(args.root, args.name, 'validation'), args.transforms, False)
 
     if world_size is None or rank is None:
-        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs, pin_memory=True)
-        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs, pin_memory=True)
+        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.data_workers, pin_memory=True)
+        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.data_workers, pin_memory=True)
         return train_loader, valid_loader
 
     train_sampler = DistributedSampler(training_data, num_replicas=world_size, rank=rank, drop_last=True)
@@ -232,7 +276,7 @@ def get_iou_types(model: Module):
 
 def all_gather(data):
     """
-    Run all_gather on arbitrary picklable data (not necessarily tensors)
+    Copied from torchvision code. Run all_gather on arbitrary picklable data (not necessarily tensors)
     Args:
         data: any picklable object
     Returns:
@@ -275,6 +319,27 @@ def all_gather(data):
 
 
 def get_circle_coords(center_y: float, center_x: float, rad_y: float, rad_x: float, height: int, width: int) -> Tuple[np.ndarray, np.ndarray]:
+    '''
+    Generates a list of coordinates inside of a circle.
+    Parameters
+    ----------
+    center_y: float
+        Y value of the center pixel of the circle
+    center_x: float
+        X value of the center pixel of the circle
+    rad_y: float
+        Y radius (technically for ellipses)
+    rad_x: float
+        X radius (technically for ellipses)
+    height: int
+        Height of the image in pixels
+    width: int
+        Width of the image in pixels
+    Returns
+    -------
+    rr, cc
+        Row and column indices of coordinates inside the circle
+    '''
     rr, cc = skimage.draw.ellipse(center_y, center_x, rad_y, rad_x)
     cc = cc[rr < height]
     rr = rr[rr < height]

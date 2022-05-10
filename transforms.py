@@ -51,6 +51,21 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
 
 
 def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transform: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    '''
+    Method for applying matrix transformations to bounding boxes.
+    Parameters
+    ----------
+    image: torch.Tensor
+        Tensor containing the image data, of shape (3, H, W)
+    target: Dict[str, torch.Tensor]
+        The dictionary containing the classes, bounding boxes, areas, etc.
+    transform: torch.Tensor
+        Matrix used to transform bounding boxes.
+    Returns
+    -------
+    areas, out_boxes
+        Tensor of transformed areas and bounding boxes
+    '''
     # Add all 4 corners
     boxes = torch.empty((target['boxes'].shape[0], 8))
     boxes[:, :4] = target['boxes'].clone().detach()
@@ -97,6 +112,17 @@ def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transf
 
 
 def target_from_masks(masks: torch.Tensor) -> Dict[str, torch.Tensor]:
+    '''
+    Given masks, convert this to a full target dictionary (generate areas, bbox, etc.)
+    Parameters
+    ----------
+    masks: torch.Tensor
+        Tensor of instance segmentations. Shape (N, H, W)
+    Returns
+    -------
+    target
+        Updated dictionary with masks, areas, bboxes, etc.
+    '''
     target = {}
 
     # We can instances with no mask by summing and checking for a positive number
@@ -207,6 +233,7 @@ class CLAHE(Module):
         image = torch.from_numpy(image_np).permute((2, 0, 1))
         return image, target
 
+
 class ContrastStretch(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image_np = image.permute((1, 2, 0)).numpy()
@@ -214,6 +241,7 @@ class ContrastStretch(Module):
         image_np = exposure.rescale_intensity(image_np, in_range=(p2, p98))
         image = torch.from_numpy(image_np).permute((2, 0, 1))
         return image, target
+
 
 transform_mappings = {
     'log_gamma': LogGamma(),

@@ -149,7 +149,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_samples_hpo', type=int, help='Number of trials to run for HPO')
     parser.add_argument('--optimizers_hpo', type=str, nargs='+', help='Optimizers to sample from in HPO')
     parser.add_argument('--resume_hpo', action='store_true', help='Whether or not to resume an HPO trial')
-    parser.add_argument('--jobs', type=int, help='Number of cores to use for parsl and dataloader workers')
+    parser.add_argument('--jobs', type=int, help='Number of cores to use for parsl')
+    parser.add_argument('--data_workers', type=int, help='Number of processes to run for dataloading')
     parser.add_argument('--name', type=str, help='Name of the model')
     parser.add_argument('--graph', action='store_true', help='Whether or not to save a plot of the results')
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
@@ -259,7 +260,8 @@ if __name__ == '__main__':
         'stats_file': None,
         'video': None,
         'simclr_checkpoint': None,
-        'augment_out': 'data/augment'
+        'augment_out': 'data/augment',
+        'data_workers': 0,
     }
     if args.config:
         if os.path.isfile(args.config):

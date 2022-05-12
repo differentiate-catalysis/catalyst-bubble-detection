@@ -19,7 +19,21 @@ def polar(r: float, theta: float, width: int, height: int) -> Tuple[int, int]:
     return int(x), int(y)
 
 
-def extract_bubbles(image_root, json_root, output_dir, trim=2):
+def extract_bubbles(image_root: str, json_root: str, output_dir:str , trim: int = 2):
+    '''
+    Grabs all bubbles instances from a labeled set.
+    Parameters
+    ----------
+    image_root: str
+        Directory containing each image file
+    json_root: str
+        Directory containing the json label for each image
+    output_dir: str
+        Where to write the individual bubble instances
+    trim: int
+        How much to shrink the radius of the bubble label by, usually to remove
+        artifacts from imprecise labels
+    '''
     i = 0
     if os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
@@ -68,7 +82,18 @@ def extract_bubbles(image_root, json_root, output_dir, trim=2):
                     i += 1
 
 
-def augment_image(image: Image.Image):
+def augment_image(image: Image.Image) -> Image.Image:
+    '''
+    Applies some torchvision transformations to randomly adjust a bubble.
+    Parameters
+    ----------
+    image: Image.Image
+        PIL image of a bubble
+    Returns
+    -------
+    image: Image.Image
+        Augmented version of the input image
+    '''
     image_tensor = pil_to_tensor(image)
     transform = T.Compose([
         T.ColorJitter(0.25, 0.25, 0.25),

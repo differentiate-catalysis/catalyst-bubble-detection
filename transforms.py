@@ -211,6 +211,17 @@ class GaussianBlur(T.GaussianBlur):
         return image, target
 
 
+class RandomSaltAndPepper(Module):
+    def __init__(self, p: float = 0.01):
+        super().__init__()
+        self.p = p
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        probs = torch.randn(image.shape[1:])
+        image[:, (probs < self.p / 2)] = 255
+        image[:, (probs > 1 - self.p / 2)] = 0
+        return image, target
+
+
 class Normalize(T.Normalize):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image = super().forward(image)
@@ -252,5 +263,6 @@ transform_mappings = {
     'rotation': RandomRotation(80),
     'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25)], p=0.5),
     'blur': RandomApply([GaussianBlur(3)], p=0.5),
-    'sharpness': RandomAdjustSharpness(1.2, 0.5)
+    'sharpness': RandomAdjustSharpness(1.2, 0.5),
+    'saltandpepper': RandomSaltAndPepper(p=0.01)
 }

@@ -18,6 +18,16 @@ from utils import get_circle_coords, tqdm, get_transforms
 
 
 def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
+    """
+    Converts v7labs style json to basic json file: UNUSED
+
+    Args:
+        infile (str): v7 labs json file
+        outfile (str, optional): file to output basic json to. Defaults to None.
+
+    Returns:
+        dict: returned directory of relevant values
+    """
     with open(infile, 'r') as infp:
         indata = json.load(infp)
         outdir = {}
@@ -39,11 +49,25 @@ def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
 
 
 def getjsontype(json_dict: dict) -> bool:
-    #Returns True if the json_dict is in basic form, False if not (probably in v7 labs form and should convert)
+    """Returns True if the json_dict is in basic form, False if not (probably in v7 labs form and should convert): UNUSED
+
+    Args:
+        json_dict (dict): JSON dictionary of keys
+
+    Returns:
+        bool: whether json_dict is in basic form
+    """
+    #
     return not ({'bubbles', 'height', 'width', 'filename'} - set(json_dict.keys()))
 
 
 def gen_label_images(indir: str, outdir: str) -> None:
+    """For all files in indir, generates semantic segmentation label images for each json file
+
+    Args:
+        indir (str): Directory containing json files_dict
+        outdir (str): Directory to store outputted image (.png) files
+    """
     in_files = [os.path.join(indir, f) for f in os.listdir(indir) if f.endswith('.json')]
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
@@ -62,6 +86,18 @@ def gen_label_images(indir: str, outdir: str) -> None:
 
 @python_app
 def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size, splits, rand_num=None):
+    """Convert v7 labs json file to .npy files for training.
+    Also converts an image file into patches and generates training masks only containing bubbles in the specific patch.
+
+    Args:
+        image_root (str): Directory containg image
+        json_root (str): Directory containing label json
+        trial_dir (str): Directory to store generated labels and patches in
+        image_name (str): Image file to process
+        patch_size (int): Width and height of patches to generate
+        splits ([float, float, float]): [test, validation, train] splits of data. Should add up to 1.
+        rand_num (float, optional): Pre-generated random number to determine split to store image in. If None, random number is generated at this function's runtime.
+    """
     image = Image.open(os.path.join(image_root, image_name)).convert(mode='RGB')
     width = image.width
     height = image.height
@@ -165,6 +201,11 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
 
 
 def gen_targets(args):
+    """Generates label numpy files, patches images if necessary, and places in train, test, and validation directories.
+
+    Args:
+        args (SimpleNamespace): Namespace of patching, storage, and splits information
+    """
     local_threads = Config(
         executors=[
             ThreadPoolExecutor(

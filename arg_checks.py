@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import List, Tuple
 
 always_need = ["mode"]
@@ -29,6 +30,8 @@ needed = {
     "stitch": ["root", "name"],
 }
 
+hpo_condense = ['lr', 'epoch', 'momentum', 'patch_size', 'batch_size', 'gamma', 'loss', 'opt', 'model', 'slices', 'patching_mode', 'overlap_size']
+
 def accum_args(modes: List[str]) -> Tuple[List[str], List[str]]:
     needed_args = always_need
     optional_args = always_allowed
@@ -50,3 +53,17 @@ def check_args(modes: List[str], changed: List[str], explicit: List[str]) -> Non
         if arg not in changed:
             print("WARNING: using default value for argument " + arg + ", which may have undesired results.")
 
+def condense_args(args: SimpleNamespace, modes: List[str]) -> SimpleNamespace:
+    is_hpo = 'optimize' in modes
+    for arg in hpo_condense:
+        if not is_hpo:
+            if type(getattr(args, arg)) is list:
+                if len(getattr(args, arg)) > 1:
+                    raise ValueError('When not HPO run, argument ' + arg + ' must be one value')
+                else:
+                    setattr(args, arg, getattr(args, arg)[0]) #make this no longer list
+        else:
+            if type(getattr(args, arg)) is not list:
+                setattr(args, arg, [getattr(args, arg)])
+    return args
+            

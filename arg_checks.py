@@ -33,6 +33,14 @@ needed = {
 hpo_condense = ['lr', 'epoch', 'momentum', 'patch_size', 'batch_size', 'gamma', 'loss', 'opt', 'model', 'slices', 'patching_mode', 'overlap_size']
 
 def accum_args(modes: List[str]) -> Tuple[List[str], List[str]]:
+    """Accumulate needed arguments for the list of modes given
+
+    Args:
+        modes (List[str]): List of modes being
+
+    Returns:
+        Tuple[List[str], List[str]]: (Set of arguments that must be present, set of arguments that can be present)
+    """
     needed_args = always_need
     optional_args = always_allowed
     for mode in modes:
@@ -43,6 +51,14 @@ def accum_args(modes: List[str]) -> Tuple[List[str], List[str]]:
     return list(set(needed_args)), list(set(optional_args))
         
 def check_args(modes: List[str], changed: List[str], explicit: List[str]) -> None:
+    """Check to make sure arguments are all being used, warn or raise if needed
+
+    Args:
+        modes (List[str]): List of modes being checked
+        changed (List[str]): List of arguments that have been changed (i.e. by a config file). Used to check if any defaults are still being used.
+        explicit (List[str]): List of arguments that have been explicitly changed (i.e. via command line arguments.) These will warn if they are not being used.
+        
+    """
     needed, optional = accum_args(modes)
     #Check if any explicit aren't needed
     for arg in explicit:

@@ -2,14 +2,12 @@ import argparse
 import json
 import os
 import shutil
-from pathlib import Path
 from types import SimpleNamespace
 from typing import List
 
 import torch.multiprocessing as mp
 
-from arg_checks import check_args
-from conversions import apply_transforms, gen_label_images, gen_targets
+from conversions import gen_label_images, gen_targets, apply_transforms
 from evaluate import run_apply, run_metrics
 from MatCNN.evaluate import run_apply as mat_run_apply
 from MatCNN.evaluate import run_metrics as mat_run_metrics
@@ -67,26 +65,7 @@ def main(args: SimpleNamespace, changed: List[str], explicit: List[str]):
             run_metrics(args, loss=loss)
             valid_mode = True
         if 'apply' in modes:
-            if args.video_dir is not None:
-                videos = []
-                video_formats = ['mp4', 'mov']
-                for format in video_formats:
-                    videos.extend(list(Path(args.video_dir).rglob('*.%s' % format.lower())))
-                    videos.extend(list(Path(args.video_dir).rglob('*.%s' % format.upper())))
-                videos = set(videos)
-                print('Found %d videos.' % len(videos))
-                root = args.root
-                for video in videos:
-                    video = str(video)
-                    args.video = video
-                    basename = os.path.basename(args.video)
-                    dot_index = basename.rfind('.')
-                    if dot_index != -1:
-                        basename = basename[: dot_index]
-                    args.root = os.path.join(root, basename)
-                    run_apply(args)
-            else:
-                run_apply(args)
+            run_apply(args)
             valid_mode = True
         if 'metrics' in modes:
             run_metrics(args)
@@ -189,10 +168,8 @@ if __name__ == '__main__':
     parser.add_argument('--video', type=str, help='Video file to perform inference on')
     parser.add_argument('--simclr_checkpoint', type=str, help='Weights for SimCLR pre-trained ResNet')
     parser.add_argument('--augment_out', type=str, help='Output directory for augment mode')
-    parser.add_argument('--video_dir', type=str, help='Directory containing videos. Recursively searches for videos')
 
     args = parser.parse_args()
-
     defaults = {
         'root': 'data/bubbles',
         'gpu': -1,
@@ -246,12 +223,10 @@ if __name__ == '__main__':
         'imagenet_stats': False,
         'stats_file': None,
         'video': None,
-        'video_dir': None,
         'simclr_checkpoint': None,
         'augment_out': 'data/augment',
         'data_workers': 0,
     }
-    
     if args.config:
         if os.path.isfile(args.config):
             configs = [args.config]

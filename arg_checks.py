@@ -11,7 +11,7 @@ optional = {
     "gen_targets": ["prompt"],
     "train": ["gamma", "mp", "world_size", "nr", "amp", "momentum", "checkpoint", "prompt", "ray_checkpoint_dir", "graph", "imagenet_stats", "stats_file", "video", "image_size", "simclr_checkpoint", "loss", "blocks", "aug", "transforms", "patience", "collect", "version", "data_workers"],
     "evaluate": ["video", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "slices", "clear_predictions"],
-    "apply": ["video", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "mask"],
+    "apply": ["video", "video_dir", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "mask"],
     "metrics": ["test_dir", "mask"],
     "optimize": ["min_lr_hpo", "max_lr_hpo", "min_momentum_hpo", "max_momentum_hpo", "min_epochs_hpo", "max_epochs_hpo", "sampling_models_hpo", "optimizers_hpo", "min_patch_size_hpo", "max_patch_size_hpo", "min_batch_size_hpo", "max_batch_size_hpo", "transforms", "min_gamma_hpo", "max_gamma_hpo", "max_epochs", "mp", "jobs", "num_samples_hpo", "resume_hpo", "patch_size", "losses", "sampling_slices", "slices", "min_overlap_size", "max_overlap_size", "sampling_patching_modes"],
     "stitch": ["test_dir", "patch_size", "overlap_size", "num_patches", "patching_mode", "image_size", "version", "overlay", "slices", "clear_predictions"]

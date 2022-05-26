@@ -9,6 +9,14 @@ from utils import tqdm
 
 
 def label_to_bubble_json(pred_file, json_file: str=None, label_file: str=None):
+    """UNUSED: Uses HoughCircles to convert a label file (i.e. a semantic segmentation output) to a list of bubbles.
+    Args:
+        pred_file (str): Image file with segmentation output
+        json_file (str, optional): JSON file to store output. Defaults to None.
+        label_file (str, optional): Image file to save circled detected bubbles to. Defaults to None.
+    Returns:
+        _type_: _description_
+    """
     img = cv.imread(pred_file,0)
     img = cv.GaussianBlur(img, (3,3), cv.BORDER_DEFAULT)
     circles = cv.HoughCircles(img,cv.HOUGH_GRADIENT,1,20,

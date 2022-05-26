@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.transforms.functional import pil_to_tensor, to_pil_image
 from tqdm import tqdm as tqdm_wrapper
 
-from transforms import Compose, ToTensor, transform_mappings
+from transforms import Compose, ToTensor, CLAHE, transform_mappings
 
 
 def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
@@ -109,6 +109,7 @@ def compute_mean_and_std_video(data_root: str, video_file: str, image_size: Tupl
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
+    # composition.append(CLAHE())
     # composition.append(AutoExpose())
     if training and transforms:
         for transform in transforms:
@@ -176,6 +177,8 @@ class Dataset(torch.utils.data.Dataset):
 
 class VideoDataset(torch.utils.data.Dataset):
     def __init__(self, video_file: str):
+        super(VideoDataset).__init__()
+        torchvision.set_video_backend('video_reader')
         self.reader = torchvision.io.VideoReader(video_file)
         metadata = self.reader.get_metadata()
         self.transform = get_transforms(True, ['clahe'])
@@ -183,9 +186,11 @@ class VideoDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         target = None
+        # start = time.time()
         image = next(self.reader)['data']
         image = to_pil_image(image, mode='RGB')
         image, _ = self.transform(image)
+        # print('Dataloading took %f seconds' % (time.time() - start))
         if index == self.length - 1:
             self.reader.seek(0)
         return image, target

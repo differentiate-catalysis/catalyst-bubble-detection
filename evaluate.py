@@ -310,7 +310,7 @@ def run_apply(args: SimpleNamespace) -> Optional[float]:
         test_set = VideoDataset(args.video)
     else:
         test_set = Dataset(test_dir, [], False)
-    test_loader = DataLoader(test_set, batch_size=1, num_workers=0, drop_last=False, collate_fn=collate_fn, pin_memory=True)
+    test_loader = DataLoader(test_set, batch_size=1, num_workers=1, drop_last=False, collate_fn=collate_fn, pin_memory=True)
 
     model_dir = 'saved/%s.pth' % (args.name)#, args.version)
     model.load_state_dict(torch.load(model_dir)['model_state_dict'])

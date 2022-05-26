@@ -64,19 +64,19 @@ def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None,
 
 
 def pick_model(args: SimpleNamespace):
-    if not set(args.sampling_models_hpo).issubset(set(model_keys)):
+    if not set(args.model).issubset(set(model_keys)):
         raise ValueError('Sampling models contain invalid values')
     def f(spec):
-        model = random.choice(args.sampling_models_hpo)
+        model = random.choice(args.model)
         return model.lower()
     return f
 
 
 def pick_optimizer(args: SimpleNamespace):
-    if not set(args.optimizers_hpo).issubset(set(['adam', 'adamw', 'sgd'])):
+    if not set(args.opt).issubset(set(['adam', 'adamw', 'sgd'])):
         raise ValueError('Optimizers to sample from contain invalid values')
     def f(spec):
-        return random.choice(args.optimizers_hpo)
+        return random.choice(args.opt)
     return f
 
 
@@ -90,18 +90,18 @@ def pick_transforms(args: SimpleNamespace):
 
 def pick_batch_size(args: SimpleNamespace):
     def f(spec):
-        max_exp = int(math.log(args.max_batch_size_hpo, 2))
-        min_exp = int(math.log(args.min_batch_size_hpo, 2))
+        max_exp = int(math.log(args.batch_size[1], 2))
+        min_exp = int(math.log(args.batch_size[0], 2))
         exp = nprd.randint(min_exp, max_exp + 1)
         return 2 ** exp
     return f
 
 
 def pick_patch_size(args: SimpleNamespace):
-    if args.min_patch_size_hpo > args.max_patch_size_hpo:
+    if args.patch_size[0] > args.patch_size[1]:
         raise ValueError('Min patch size is larger than max patch size')
     def f(spec):
-        return nprd.randint(args.min_patch_size_hpo, args.max_patch_size_hpo + 1)
+        return nprd.randint(args.patch_size[0], args.patch_size[1] + 1)
     return f
 
 
@@ -120,20 +120,20 @@ def optimize(args: SimpleNamespace):
     hyperparam_config = {
         'model': tune.sample_from(pick_model(args)),
         'opt': tune.sample_from(pick_optimizer(args)),
-        'lr': tune.loguniform(args.min_lr_hpo, args.max_lr_hpo),
-        'momentum': tune.uniform(args.min_momentum_hpo, args.max_momentum_hpo),
-        'epoch': tune.sample_from(lambda _: nprd.randint(args.min_epochs_hpo, args.max_epochs_hpo+1)),
+        'lr': tune.loguniform(args.lr[0], args.lr[1]),
+        'momentum': tune.uniform(args.momentum[0], args.momentum[1]),
+        'epoch': tune.sample_from(lambda _: nprd.randint(args.epoch[0], args.epoch[1]+1)),
         'patch_size': tune.sample_from(pick_patch_size(args)),
         'batch_size': tune.sample_from(pick_batch_size(args)),
         'transforms': tune.sample_from(pick_transforms(args)),
-        'gamma': tune.loguniform(args.min_gamma_hpo, args.max_gamma_hpo),
+        'gamma': tune.loguniform(args.gamma[0], args.gamma[1]),
     }
     if not os.path.isdir(name_dir):
         os.mkdir(name_dir)
     scheduler = ASHAScheduler(
             metric='map',
             mode='max',
-            max_t=args.max_epochs,
+            max_t=args.epoch[1],
             grace_period=1,
             reduction_factor=2
     )
@@ -157,7 +157,7 @@ def optimize(args: SimpleNamespace):
             resources_per_trial = trial_resources,
             config = hyperparam_config,
             local_dir = 'saved/tune',
-            num_samples = args.num_samples_hpo,
+            num_samples = args.num_samples,
             scheduler = scheduler,
             progress_reporter = reporter,
             resume=args.resume_hpo,

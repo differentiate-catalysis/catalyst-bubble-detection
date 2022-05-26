@@ -212,7 +212,6 @@ if __name__ == '__main__':
     parser.add_argument('--nr', type=int, help='Index of the current node\'s first rank. Only necessary if mp is set.')
     parser.add_argument('--transforms', type=str, nargs='*', help='Which augmentations to use. Choose some combination of \'vertical_flip\', \'horizontal_flip\', and \'rotation\'. Default: %s' % defaults['transforms'])
     parser.add_argument('--model', type=str, nargs='*', help='Which model architecture to use. Available models include \'mask_rcnn\', \'faster_rcnn\', \'retina_net\', and \'simclr_faster_rcnn\'. Default: %s' % defaults['model'])
-    parser.add_argument('--model', type=str, help='Which model architecture to use. Available models include \'mask_rcnn\', \'faster_rcnn\', \'retina_net\', and \'simclr_faster_rcnn\'. Default: %s' % defaults['model'])
     parser.add_argument('--config', type=str, help='Location of a full configuration file. This contains options for a given run.')
     parser.add_argument('--json_dir', type=str, help='Directory containing several JSON configuration files.')
     parser.add_argument('--num_images', type=int, help='Number of images to train on') # idt this is used tbh

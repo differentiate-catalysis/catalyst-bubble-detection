@@ -113,6 +113,8 @@ def optimize(args: SimpleNamespace):
     ---------
     args: SimpleNamespace
         Namespace of HPO and training options
+        For HPO purposes, arguments lr, epoch, momentum, patch_size, batch_size, gamma and loss
+        must be 2 values: [min, max]
     '''
     if len(args.root) > 0 and args.root[0] != '/':
         args.root = os.path.join(os.getcwd(), args.root)
@@ -133,7 +135,7 @@ def optimize(args: SimpleNamespace):
     scheduler = ASHAScheduler(
             metric='map',
             mode='max',
-            max_t=args.epoch[1],
+            max_t=args.epoch[1], #Max epochs
             grace_period=1,
             reduction_factor=2
     )

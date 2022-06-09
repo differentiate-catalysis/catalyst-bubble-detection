@@ -35,7 +35,7 @@ hpo_condense = ['lr', 'epoch', 'momentum', 'patch_size', 'batch_size', 'gamma', 
 def accum_args(modes: List[str]) -> Tuple[List[str], List[str]]:
     """Accumulate needed arguments for the list of modes given
     Args:
-        modes (List[str]): List of modes being
+        modes (List[str]): List of modes being used (options: gen_labels, augment, image2npy, gen_targets, train, evaluate, apply, metrics, optimize, stitch)
     Returns:
         Tuple[List[str], List[str]]: (Set of arguments that must be present, set of arguments that can be present)
     """
@@ -51,7 +51,7 @@ def accum_args(modes: List[str]) -> Tuple[List[str], List[str]]:
 def check_args(modes: List[str], changed: List[str], explicit: List[str]) -> None:
     """Check to make sure arguments are all being used, warn or raise if needed
     Args:
-        modes (List[str]): List of modes being checked
+        modes (List[str]): List of modes being checked (options: gen_labels, augment, image2npy, gen_targets, train, evaluate, apply, metrics, optimize, stitch)
         changed (List[str]): List of arguments that have been changed (i.e. by a config file). Used to check if any defaults are still being used.
         explicit (List[str]): List of arguments that have been explicitly changed (i.e. via command line arguments.) These will warn if they are not being used.
         
@@ -72,7 +72,7 @@ def condense_args(args: SimpleNamespace, modes: List[str]) -> SimpleNamespace:
         if not is_hpo:
             if type(getattr(args, arg)) is list:
                 if len(getattr(args, arg)) > 1:
-                    raise ValueError('When not HPO run, argument ' + arg + ' must be one value')
+                    raise ValueError('When not HPO run, only one argument must be provided for arugment ' + arg)
                 else:
                     setattr(args, arg, getattr(args, arg)[0]) #make this no longer list
         else:

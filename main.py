@@ -203,7 +203,6 @@ if __name__ == '__main__':
     parser.add_argument('--amp', action='store_true', help='Use mixed precision (reduces VRAM requirements). Default: %s' % defaults['amp'])
     parser.add_argument('--opt', type=str, nargs='*', help='Optimizer to train with. Either \'adam\' or \'sgd\'. Default: %s' % defaults['opt'])
     parser.add_argument('--momentum', type=float, nargs='*', help='Momentum for SGD. Default: %s' % defaults['momentum'])
-    parser.add_argument('--aug', help='Whether or not to augment inputs', action='store_true') #TODO: remove
     parser.add_argument('--test_dir', type=str, help='Directory to test model on. Default: %s' % defaults['test_dir'])
     parser.add_argument('--save', type=str, help='Directory to write saved model weights to. Subdirectories will be created for HPO runs. Default: %s' % defaults['save'])
     parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Available modes include \'train\', \'apply\', \'evaluate\', and \'optimize\'')
@@ -217,7 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_images', type=int, help='Number of images to train on') # idt this is used tbh
     parser.add_argument('--checkpoint', type=str, help='Filepath to a set of saved weights (pth file) to load')
     parser.add_argument('--no-prompt', dest='prompt', action='store_false', help='Skip prompt for checkpoint loading. Default: %s' % (not defaults['prompt']))
-    parser.add_argument('--num_samples', type=int, help='Number of trials to run for HPO')
+    parser.add_argument('--num_samples', type=int, help='Number of trials to run for HPO (only relevant if mode is \'optimize\')')
     parser.add_argument('--resume_hpo', action='store_true', help='Whether or not to resume an HPO trial')
     parser.add_argument('--jobs', type=int, help='Number of cores to use for parsl')
     parser.add_argument('--data_workers', type=int, help='Number of processes to run for dataloading')

@@ -1,9 +1,11 @@
 import math
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
+from skimage import exposure
 from torch.nn import Module
 
 
@@ -49,6 +51,21 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
 
 
 def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transform: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    '''
+    Method for applying matrix transformations to bounding boxes.
+    Parameters
+    ----------
+    image: torch.Tensor
+        Tensor containing the image data, of shape (3, H, W)
+    target: Dict[str, torch.Tensor]
+        The dictionary containing the classes, bounding boxes, areas, etc.
+    transform: torch.Tensor
+        Matrix used to transform bounding boxes.
+    Returns
+    -------
+    areas, out_boxes
+        Tensor of transformed areas and bounding boxes
+    '''
     # Add all 4 corners
     boxes = torch.empty((target['boxes'].shape[0], 8))
     boxes[:, :4] = target['boxes'].clone().detach()
@@ -95,6 +112,17 @@ def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transf
 
 
 def target_from_masks(masks: torch.Tensor) -> Dict[str, torch.Tensor]:
+    '''
+    Given masks, convert this to a full target dictionary (generate areas, bbox, etc.)
+    Parameters
+    ----------
+    masks: torch.Tensor
+        Tensor of instance segmentations. Shape (N, H, W)
+    Returns
+    -------
+    target
+        Updated dictionary with masks, areas, bboxes, etc.
+    '''
     target = {}
 
     # We can instances with no mask by summing and checking for a positive number
@@ -183,17 +211,58 @@ class GaussianBlur(T.GaussianBlur):
         return image, target
 
 
+class RandomSaltAndPepper(Module):
+    def __init__(self, p: float = 0.01):
+        super().__init__()
+        self.p = p
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        probs = torch.randn(image.shape[1:])
+        image[:, (probs < self.p / 2)] = 255
+        image[:, (probs > 1 - self.p / 2)] = 0
+        return image, target
+
+
 class Normalize(T.Normalize):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image = super().forward(image)
         return image, target
 
 
+class LogGamma(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image_np = image.numpy()
+        for c in range(image_np.shape[0]):
+            image_np[c] = exposure.adjust_log(image_np[c], 1)
+        image = torch.from_numpy(image_np)
+        return image, target
+
+
+class CLAHE(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image_np = image.permute((1, 2, 0)).numpy()
+        image_np = exposure.equalize_adapthist(image_np)
+        image = torch.from_numpy(image_np).permute((2, 0, 1))
+        return image, target
+
+
+class ContrastStretch(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image_np = image.permute((1, 2, 0)).numpy()
+        p2, p98 = np.percentile(image_np, (2, 98))
+        image_np = exposure.rescale_intensity(image_np, in_range=(p2, p98))
+        image = torch.from_numpy(image_np).permute((2, 0, 1))
+        return image, target
+
+
 transform_mappings = {
+    'log_gamma': LogGamma(),
+    'clahe': CLAHE(),
+    'contrast_stretch': ContrastStretch(),
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),
     'gray_balance_adjust': RandomApply([ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25)], p=0.5),
     'blur': RandomApply([GaussianBlur(3)], p=0.5),
-    'sharpness': RandomAdjustSharpness(1.2, 0.5)
+    'sharpness': RandomAdjustSharpness(1.2, 0.5),
+    'saltandpepper': RandomSaltAndPepper(p=0.01)
 }

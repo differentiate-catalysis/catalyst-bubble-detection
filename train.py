@@ -1,6 +1,7 @@
 import math
 import os
 from types import SimpleNamespace
+from typing import List
 
 import matplotlib.pyplot as plt
 import ray
@@ -12,14 +13,23 @@ from torch.nn import Module
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, Optimizer
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from evaluate import evaluate
 from models import model_mappings
-from utils import get_dataloaders, warmup_lr_scheduler
+from utils import get_dataloaders, tqdm, warmup_lr_scheduler
 
 
 def train_model(gpu: int, args: SimpleNamespace):
+    '''
+    General training function for models. Handles initializing necessary objects,
+    tracking metrics, and calling train and evaluation loops.
+    Parameters
+    ----------
+    gpu: int
+        CUDA ordinal for what GPU to run on
+    args: SimpleNamespace
+        Namespace of all options/hyperparameters
+    '''
     loss_train_list = []
     loss_val_list = []
     if args.mp:
@@ -139,7 +149,7 @@ def train_model(gpu: int, args: SimpleNamespace):
 
             tune.report(loss=loss_eval, iou=iou_eval, map=mAP_eval)
             with args.ray_checkpoint_dir(step=epoch) as checkpoint_dir:
-                model_dir = os.path.join(checkpoint_dir, 'best.pth')
+                model_dir = os.path.join(checkpoint_dir, os.pardir, 'last.pth')
 
         # Checkpoint if good result, only checkpoint on one rank
         if (iou_eval > iou_max or tune.is_session_enabled()) and (rank == None or rank == 0):
@@ -160,10 +170,29 @@ def train_model(gpu: int, args: SimpleNamespace):
             }, model_dir)
 
         if args.graph:
-            graph(loss_train_list, loss_val_list, os.path.join(args.save, 'loss.png'))
+            if not os.path.isdir(os.path.join(args.save, 'plots')):
+                os.mkdir(os.path.join(args.save, 'plots'))
+            graph(loss_train_list, loss_val_list, os.path.join(args.save, 'plots', '%s.png' %(args.name)))
 
 
 def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, epoch: int, amp: bool, gpu: int) -> float:
+    '''
+    Train loop for models.
+    Parameters
+    ----------
+    model: Module
+        A torchvision compatible object detector, such as Faster-RCNN or Mask-RCNN.
+    optimizer: Optimizer
+        A PyTorch optimizer with the model parameters.
+    train_loader: DataLoader
+        Dataloader for the training data
+    epoch: int
+        Current training epoch
+    amp: bool
+        Whether or not to use Accelerated Mixed Precision - lowers memory requirements
+    gpu: int
+        CUDA ordinal for which GPU to run on
+    '''
     if gpu != -1:
         device = torch.device('cuda', gpu)
     else:
@@ -189,8 +218,6 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
 
         if not math.isfinite(loss_value):
             print('Loss is %s, stopping training' % loss_value)
-            if tune.is_session_enabled():
-                tune.report(loss=10000, iou=0, map=0)
             return 10000
 
         scaler.scale(losses).backward()
@@ -206,11 +233,24 @@ def train_epoch(model: Module, optimizer: Optimizer, train_loader: DataLoader, e
 
     return total_loss / num_samples
 
-def graph(loss_train_list, loss_val_list, save_path):
+def graph(loss_train_list: List, loss_val_list: List, save_path: str):
+    '''
+    Graphs the train and validation loss, writes it to a file.
+    Parameters
+    ----------
+    loss_train_list: List
+        List containing the loss at each epoch during training
+    loss_val_list: List
+        List containing the loss during validation at the end of each epoch
+    save_path: str
+        Path to the file to write the graph to
+    '''
     fig, ax = plt.subplots()
     x = range(len(loss_train_list))
     ax.plot(x, loss_train_list, label='Training Loss')
     ax.plot(x, loss_val_list, label='Validation Loss')
+    ax.set_xlim(0, len(loss_train_list) - 1)
+    plt.xticks(range(len(loss_train_list)))
     ax.set(xlabel='Epoch', ylabel='Loss',
            title='Loss of Model')
     plt.legend(loc="upper left")

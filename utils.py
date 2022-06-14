@@ -2,27 +2,44 @@ import argparse
 import json
 import os
 import pickle
+import time
 from math import ceil
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
+import cv2
 import numpy as np
+import skimage.draw
 import torch
 import torch.distributed
 import torch.utils.data
 import torchvision
 from PIL import Image
+from ray import tune
 from torch.nn.modules.module import Module
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, DistributedSampler
 from torchvision.transforms.functional import pil_to_tensor, to_pil_image
-from tqdm import tqdm
+from tqdm import tqdm as tqdm_wrapper
 
-from transforms import Compose, ToTensor, transform_mappings
+from transforms import Compose, ToTensor, CLAHE, transform_mappings
 
 
 def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
+    '''
+    Compute the means and standard deivations of each channel, writes to a stats file.
+    Parameters
+    ----------
+    split_paths: List[str]
+        List of paths to search for images under. Typically we'd search under train and validation.
+    image_size: Tuple[int, int]
+        Size of each image in pixels.
+    Returns
+    -------
+    means, std
+        Means and standard deivations of the dataset
+    '''
     images = []
     for split_path in split_paths:
         images.extend(list(Path(split_path).rglob('*.jpg')))
@@ -50,9 +67,50 @@ def compute_mean_and_std(split_paths: List[str], image_size: Tuple[int, int]) ->
     return means, std
 
 
+def compute_mean_and_std_video(data_root: str, video_file: str, image_size: Tuple[int, int]) -> Tuple[List[float], List[float]]:
+    '''
+    Compute the means and standard deivations of each channel, writes to a stats file.
+    Parameters
+    ----------
+    data_root: str
+        Where to write the stats file to
+    video_file: str
+        The video file to compute stats over
+    image_size: Tuple[int, int]
+        Size of each frame in pixels.
+    Returns
+    -------
+    means, std
+        Means and standard deivations of the dataset
+    '''
+    dataset = VideoDataset(video_file)
+    mean_tensor = torch.zeros((3, len(dataset)))
+    std_tensor = torch.zeros((3, len(dataset)))
+    for i, (im, _) in enumerate(tqdm(dataset, desc='Calculating mean...')):
+        im = im.float() / 255
+        means = torch.mean(im, dim=(-1, -2))
+        mean_tensor[:, i] = means
+    means = torch.mean(mean_tensor, dim=-1)
+    dataset = VideoDataset(video_file)
+    for i, (im, _) in enumerate(tqdm(dataset, desc='Calculating stddev...')):
+        im = im.float() / 255
+        stds = torch.mean((im - means.reshape(3, 1, 1))**2, dim=(-1, -2))
+        std_tensor[:, i] = stds
+    weight = image_size[0] * image_size[1]
+    std = torch.sqrt(weight * torch.sum(std_tensor, dim=-1) / (weight * len(dataset) - 1))
+    means = means.cpu().tolist()
+    std = std.cpu().tolist()
+    with open(os.path.join(data_root, 'stats.json'), 'w') as f:
+        json.dump({'mean': means, 'std': std}, f)
+
+    return means, std
+
+
 def get_transforms(training: bool, transforms: List[str]) -> Compose:
     composition = []
     composition.append(ToTensor())
+    # composition.append(CLAHE())
+    # composition.append(AutoExpose())
     if training and transforms:
         for transform in transforms:
             if transform in transform_mappings:
@@ -69,7 +127,7 @@ class Dataset(torch.utils.data.Dataset):
         self.patch_root = os.path.join(root, 'patches/')
         # self.json_root = os.path.join(root, '..', 'json/')
         self.target_root = os.path.join(root, 'targets/')
-        self.image_ids = os.listdir(self.patch_root)
+        self.image_ids = sorted(os.listdir(self.patch_root))
         self.training = training
         self.stats = os.path.join(root, '..', 'stats.json')
         self.transform = get_transforms(self.training, transforms)
@@ -97,8 +155,10 @@ class Dataset(torch.utils.data.Dataset):
             target['masks'] = mask
             target['image_id'] = torch.tensor([index])
             # Augment the image and target
-
+            start = time.time()
             image, target = self.transform(image, target)
+            end = time.time()
+            # print('Augmenting took %0.4f ms' % ((end - start)*1000))
         return image, target
 
     def __len__(self):
@@ -117,17 +177,21 @@ class Dataset(torch.utils.data.Dataset):
 
 class VideoDataset(torch.utils.data.Dataset):
     def __init__(self, video_file: str):
+        super(VideoDataset).__init__()
+        torchvision.set_video_backend('video_reader')
         self.reader = torchvision.io.VideoReader(video_file)
         metadata = self.reader.get_metadata()
-        self.transform = get_transforms(False, [])
+        self.transform = get_transforms(True, ['clahe'])
         self.length = ceil(metadata['video']['duration'][0] * metadata['video']['fps'][0])
 
     def __getitem__(self, index):
         target = None
+        # start = time.time()
         image = next(self.reader)['data']
         image = to_pil_image(image, mode='RGB')
         image, _ = self.transform(image)
-        if index == self.length:
+        # print('Dataloading took %f seconds' % (time.time() - start))
+        if index == self.length - 1:
             self.reader.seek(0)
         return image, target
 
@@ -140,15 +204,28 @@ def collate_fn(batch):
 
 
 def get_dataloaders(args: SimpleNamespace, world_size: Optional[int], rank: Optional[int]) -> Tuple[DataLoader, DataLoader]:
-    if not os.path.isfile(os.path.join(args.root, 'stats.json')):
-        compute_mean_and_std([os.path.join(args.root, args.name, 'train'), os.path.join(args.root, args.name, 'validation')], args.image_size)
+    '''
+    Instantiates dataloaders for training and validation.
+    Parameters
+    ----------
+    args: SimpleNamespace
+        Namespace containing all options and hyperparameters
+    world_size: Optional[int]
+        If multiprocessing, set as number of nodes * number of GPUs. If not, set to None
+    rank: Optional[int]
+        If multiprocessing, set as the rank of the process. If not, set to None
+    Returns
+    -------
+    train_loader, valid_loader
+        Dataloaders for training and validation
+    '''
     training_data = Dataset(os.path.join(args.root, args.name, 'train'), args.transforms, True, num_images=args.num_images)
     print("Number of labels in training data: " + str(training_data.get_num_labels()))
     validation_data = Dataset(os.path.join(args.root, args.name, 'validation'), args.transforms, False)
 
     if world_size is None or rank is None:
-        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)
-        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.jobs)
+        train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True, num_workers=args.data_workers, pin_memory=True)
+        valid_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True, num_workers=args.data_workers, pin_memory=True)
         return train_loader, valid_loader
 
     train_sampler = DistributedSampler(training_data, num_replicas=world_size, rank=rank, drop_last=True)
@@ -170,19 +247,24 @@ def warmup_lr_scheduler(optimizer: Optimizer, warmup_iters: int, warmup_factor: 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, f)
 
 
-def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> SimpleNamespace:
+def gen_args(args: Union[SimpleNamespace, argparse.Namespace], defaults: Dict, file_args: Optional[Dict] = None, config: Optional[str] = None) -> Tuple[SimpleNamespace, List[str], List[str]]:
     full_args = defaults.copy()
+    changed = []
+    explicit = []
     if file_args is not None:
         for key, value in file_args.items():
                 full_args[key] = value
+                changed.append(key)
     for key in full_args.keys(): #Sub in with direct from command args
         if hasattr(args, key) and getattr(args, key) is not None:
             new_attr = getattr(args, key)
             if type(new_attr) is not bool or new_attr is not defaults[key]:
                 full_args[key] = new_attr
+                changed.append(key)
+                explicit.append(key)
     if config:
         full_args['config'] = config
-    return SimpleNamespace(**full_args)
+    return SimpleNamespace(**full_args), changed, explicit
 
 
 def get_iou_types(model: Module):
@@ -199,7 +281,7 @@ def get_iou_types(model: Module):
 
 def all_gather(data):
     """
-    Run all_gather on arbitrary picklable data (not necessarily tensors)
+    Copied from torchvision code. Run all_gather on arbitrary picklable data (not necessarily tensors)
     Args:
         data: any picklable object
     Returns:
@@ -239,3 +321,43 @@ def all_gather(data):
         data_list.append(pickle.loads(buffer))
 
     return data_list
+
+
+def get_circle_coords(center_y: float, center_x: float, rad_y: float, rad_x: float, height: int, width: int) -> Tuple[np.ndarray, np.ndarray]:
+    '''
+    Generates a list of coordinates inside of a circle.
+    Parameters
+    ----------
+    center_y: float
+        Y value of the center pixel of the circle
+    center_x: float
+        X value of the center pixel of the circle
+    rad_y: float
+        Y radius (technically for ellipses)
+    rad_x: float
+        X radius (technically for ellipses)
+    height: int
+        Height of the image in pixels
+    width: int
+        Width of the image in pixels
+    Returns
+    -------
+    rr, cc
+        Row and column indices of coordinates inside the circle
+    '''
+    rr, cc = skimage.draw.ellipse(center_y, center_x, rad_y, rad_x)
+    cc = cc[rr < height]
+    rr = rr[rr < height]
+    rr = rr[cc < width]
+    cc = cc[cc < width]
+    cc = cc[rr >= 0]
+    rr = rr[rr >= 0]
+    rr = rr[cc >= 0]
+    cc = cc[cc >= 0]
+    return rr, cc
+
+
+def tqdm(iterable: Iterable, **kwargs):
+    if tune.is_session_enabled():
+        return iterable
+    return tqdm_wrapper(iterable, **kwargs)

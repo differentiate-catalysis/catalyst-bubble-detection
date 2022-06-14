@@ -1,24 +1,33 @@
 import json
 import math
 import os
-import shutil
 import random
+import shutil
 
-import cv2 as cv
 import numpy as np
 import parsl
-import skimage.draw
 import torch
 from parsl import python_app
 from parsl.config import Config
 from parsl.executors.threads import ThreadPoolExecutor
 from PIL import Image, ImageDraw
-from tqdm import tqdm
+import cv2
 
 from transforms import target_from_masks
+from utils import get_circle_coords, tqdm, get_transforms
 
 
 def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
+    """
+    Converts v7labs style json to basic json file: UNUSED
+
+    Args:
+        infile (str): v7 labs json file
+        outfile (str, optional): file to output basic json to. Defaults to None.
+
+    Returns:
+        dict: returned directory of relevant values
+    """
     with open(infile, 'r') as infp:
         indata = json.load(infp)
         outdir = {}
@@ -40,11 +49,25 @@ def v7labstobasicjson(infile: str, outfile: str=None) -> dict:
 
 
 def getjsontype(json_dict: dict) -> bool:
-    #Returns True if the json_dict is in basic form, False if not (probably in v7 labs form and should convert)
+    """Returns True if the json_dict is in basic form, False if not (probably in v7 labs form and should convert): UNUSED
+
+    Args:
+        json_dict (dict): JSON dictionary of keys
+
+    Returns:
+        bool: whether json_dict is in basic form
+    """
+    #
     return not ({'bubbles', 'height', 'width', 'filename'} - set(json_dict.keys()))
 
 
 def gen_label_images(indir: str, outdir: str) -> None:
+    """For all files in indir, generates semantic segmentation label images for each json file
+
+    Args:
+        indir (str): Directory containing json files_dict
+        outdir (str): Directory to store outputted image (.png) files
+    """
     in_files = [os.path.join(indir, f) for f in os.listdir(indir) if f.endswith('.json')]
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
@@ -63,6 +86,18 @@ def gen_label_images(indir: str, outdir: str) -> None:
 
 @python_app
 def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size, splits, rand_num=None):
+    """Convert v7 labs json file to .npy files for training.
+    Also converts an image file into patches and generates training masks only containing bubbles in the specific patch.
+
+    Args:
+        image_root (str): Directory containg image
+        json_root (str): Directory containing label json
+        trial_dir (str): Directory to store generated labels and patches in
+        image_name (str): Image file to process
+        patch_size (int): Width and height of patches to generate
+        splits ([float, float, float]): [test, validation, train] splits of data. Should add up to 1.
+        rand_num (float, optional): Pre-generated random number to determine split to store image in. If None, random number is generated at this function's runtime.
+    """
     image = Image.open(os.path.join(image_root, image_name)).convert(mode='RGB')
     width = image.width
     height = image.height
@@ -90,16 +125,7 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
             radius_x = bubble[2]
             radius_y = bubble[3]
             # Generate points for mask
-            rr, cc = skimage.draw.ellipse(center_y, center_x, radius_y, radius_x)
-            # Limit these to only points in the image
-            cc = cc[rr < height]
-            rr = rr[rr < height]
-            rr = rr[cc < width]
-            cc = cc[cc < width]
-            cc = cc[rr >= 0]
-            rr = rr[rr >= 0]
-            rr = rr[cc >= 0]
-            cc = cc[cc >= 0]
+            rr, cc = get_circle_coords(center_y, center_x, radius_y, radius_x, height, width)
             mask[i, rr, cc] = 1
 
     # Prepare for patching
@@ -175,6 +201,11 @@ def convert_to_targets(image_root, json_root, trial_dir, image_name, patch_size,
 
 
 def gen_targets(args):
+    """Generates label numpy files, patches images if necessary, and places in train, test, and validation directories.
+
+    Args:
+        args (SimpleNamespace): Namespace of patching, storage, and splits information
+    """
     local_threads = Config(
         executors=[
             ThreadPoolExecutor(
@@ -226,3 +257,16 @@ def gen_targets(args):
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()
+
+def apply_transforms(args):
+    transform_compose = get_transforms(True, args.transforms)
+    images = [os.path.join(args.root, f) for f in os.listdir(args.root) if os.path.isfile(os.path.join(args.root, f))]
+    for image_file in tqdm(images):
+        image = Image.open(image_file).convert(mode='RGB')
+        image, _ = transform_compose(image)
+        image = image.numpy()
+        image = np.transpose(image, (1, 2, 0))
+        if not os.path.isdir(args.augment_out):
+            os.makedirs(args.augment_out)
+        image *= 255
+        cv2.imwrite(os.path.join(args.augment_out, os.path.basename(image_file)), image)

@@ -1,12 +1,22 @@
-import os
-import json
 import argparse
+import json
+import os
 
 import cv2 as cv
 import numpy as np
-from tqdm import tqdm
+
+from utils import tqdm
+
 
 def label_to_bubble_json(pred_file, json_file: str=None, label_file: str=None):
+    """UNUSED: Uses HoughCircles to convert a label file (i.e. a semantic segmentation output) to a list of bubbles.
+    Args:
+        pred_file (str): Image file with segmentation output
+        json_file (str, optional): JSON file to store output. Defaults to None.
+        label_file (str, optional): Image file to save circled detected bubbles to. Defaults to None.
+    Returns:
+        _type_: _description_
+    """
     img = cv.imread(pred_file,0)
     img = cv.GaussianBlur(img, (3,3), cv.BORDER_DEFAULT)
     circles = cv.HoughCircles(img,cv.HOUGH_GRADIENT,1,20,
@@ -37,6 +47,7 @@ def label_to_bubble_json(pred_file, json_file: str=None, label_file: str=None):
             json.dump(outdir, outfp, indent=2)
     return outdir
 
+
 def prediction_to_bubble_dir(pred_dir, json_dir = None, label_dir = None):
     if json_dir and not os.path.isdir(json_dir):
         os.makedirs(json_dir)
@@ -47,6 +58,7 @@ def prediction_to_bubble_dir(pred_dir, json_dir = None, label_dir = None):
         json_file = os.path.join(json_dir, os.path.splitext(file)[0] + '.json') if json_dir else None
         label_file = os.path.join(label_dir, file) if label_dir else None
         label_to_bubble_json(os.path.join(pred_dir, file), json_file, label_file)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -16,6 +16,8 @@ from torch.utils.data import DataLoader
 from torchnet.meter import ConfusionMeter
 
 import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm

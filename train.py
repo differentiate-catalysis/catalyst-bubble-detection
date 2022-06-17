@@ -3,6 +3,8 @@ import os
 from types import SimpleNamespace
 from typing import List
 
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import ray
 import torch

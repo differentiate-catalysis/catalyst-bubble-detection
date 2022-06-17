@@ -46,7 +46,7 @@ def optim_train(config: Dict, checkpoint_dir: str = None, defaults: Dict = None,
         defaults['prompt'] = False
         defaults['tar'] = True
         defaults['model'] = 'unet'
-    args = gen_args(args=SimpleNamespace(**config), defaults=defaults)
+    args = gen_args(args=SimpleNamespace(**config), defaults=defaults)[0]
     args.jobs = args.jobs // args.gpu
     args.data_workers = args.jobs
     if args.mp:
@@ -152,7 +152,7 @@ def optimize(args: SimpleNamespace):
         trial_resources = None
     else:
         trainer = partial(optim_train, args_space=args, dir=source_dir)
-        trial_resources = {'cpu': args.jobs//args.gpu, 'gpu': 1 if args.gpu > -1 else 0}
+        trial_resources = {'cpu': args.jobs//args.gpu if args.gpu > -1 else args.jobs, 'gpu': 1 if args.gpu > -1 else 0}
     result = tune.run(
             trainer,
             name = args.name,

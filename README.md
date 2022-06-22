@@ -244,8 +244,10 @@ Various other modes are available as well:
 ### Instance Segmentation
 
 ```
-maskrcnn
-fasterrcnn
+mask_rcnn
+faster_rcnn
+retina_net
+simclr_faster_rcnn
 ```
 
 ### Semantic Segmentation

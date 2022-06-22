@@ -10,7 +10,10 @@ from tqdm import tqdm
 from types import SimpleNamespace
 
 class AverageMeter(object):
-    # Computes and stores the average and current value
+    """
+        Computes and stores the average and current value
+        Copied from: https://github.com/pytorch/examples/blob/master/imagenet/main.py
+    """
     def __init__(self, name, fmt=':f'):
         self.name = name
         self.fmt = fmt

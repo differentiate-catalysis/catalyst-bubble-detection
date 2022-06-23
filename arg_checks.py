@@ -8,7 +8,7 @@ optional = {
     "gen_labels": [],
     "augment": [],
     "image2npy": ["jobs", "test_set", "train_set", "val_set", "prompt", "split", "patch_size", "overlap_size"],
-    "gen_targets": ["prompt", "run_dir", "split", "save"],
+    "gen_targets": ["prompt", "run_dir", "split", "save", "train_set", "test_set", "val_set"],
     "train": ["gamma", "save", "num_images", "mp", "world_size", "nr", "amp", "momentum", "checkpoint", "prompt", "ray_checkpoint_dir", "graph", "imagenet_stats", "stats_file", "video", "image_size", "simclr_checkpoint", "loss", "blocks", "aug", "transforms", "patience", "collect", "version", "data_workers"],
     "evaluate": ["video", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "slices", "clear_predictions"],
     "apply": ["video", "video_dir", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "mask"],

@@ -56,7 +56,7 @@ Generally, configurations should contain some key parameters:
 * **`gpu`**: The GPU to use when running the model. Use -1 for CPU only training.
 * **`model`**: The type of model to use. See [Available Models](#available-models) for a list of options.
 
-Additionally, each run should have one or more modes given as a command line argument. Modes include `'train'`, `'apply'`, `'evaluate'`, and `'optimize'`. See [Usage](#usage) for more information on available modes.
+Additionally, each run should have one or more modes given as a command line argument. Most commonly used modes include `'train'`, `'apply'`, `'evaluate'`, and `'optimize'`. See [Usage](#usage) for more information on available modes.
 
 ### All Configuration Parameters
 

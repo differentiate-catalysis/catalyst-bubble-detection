@@ -45,7 +45,7 @@ root/
 
 ## Configurations
 
-Configurations can be accessed in two ways, via command line flags or via [configuration files](#configuration-files).
+Configurations can be set in two ways, via command line flags or via [configuration files](#configuration-files).
 
 ### Key Configuration Parameters
 
@@ -144,7 +144,7 @@ Additionally, each run should have one or more modes given as a command line arg
 
 ### Configuration Files
 
-Any flags can also be included in a configuration file, a JSON file with key-value pairs for each flag and its associated value. This can then be used with the `--config` flag at runtime. For instance, an example `maskrcnn_test.json` may contain the following:
+Any flags can also be included in a configuration file. The configuration file is a JSON file with key-value pairs for each flag and its associated value. This can then be used with the `--config` flag at runtime. For instance, an example `maskrcnn_test.json` config may contain the following:
 
 ```
 {
@@ -165,17 +165,21 @@ Any flags can also be included in a configuration file, a JSON file with key-val
 }
 ```
 
-And would be run (e.g. for training) using `python main.py --config maskrcnn_test.json --mode train`
+This can be run (e.g. for training) using 
+
+```
+python main.py --config maskrcnn_test.json --mode train
+```
 
 ## Usage
 
-The general workflow starts with preprocessing via generating target data, training the model, then evaluating or applying the model.
+The general workflow starts with preprocessing via generating target data, training the model, then evaluating or applying (e.g. running inference with) the model.
 
-For improved results, we recommend using hyperparameter optimization to find the optimal parameters for each given run. 
+For improved results, we recommend using hyperparameter optimization (HPO) to find the optimal parameters for each given run. 
 
 ### Generate Target Images
 
-The `gen_targets` mode is used to generate target data: images and associated .npy files containing the associated bubbles.
+The `gen_targets` mode is used to generate target data for model training: images and associated .npy files containing the associated bubbles.
 
 The `splits` configuration option, a list of 3 floats, is used to determine the [test, validation, train] splits of the data. It defaults to `[0.1, 0.2, 0.7]`. The images in each split are chosen randomly.
 

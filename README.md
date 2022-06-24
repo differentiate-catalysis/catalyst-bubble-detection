@@ -1,9 +1,11 @@
 # catalyst-bubble-detection
-Detect bubbles that are evolving gas from a catalyst surface to determine reaction activity. This can be used for screening catalysts to choose the most optimal.
+
+The `catalyst-bubble-detection` project aims to use ML to detect bubbles in high-throughput microscope images of catalyst surfaces. This repo contains the full ML pipeline for training, testing, evaluating, and optimizing ML models for bubble detection. The goal of this work is to screen catalysts to choose the most optimal one for a given gaseous reaction (e.g. oxygen evolution and oxygen reduction reactions).
+
 
 ## Data Setup
 
-The package is designed to be used with labeled data from Darwin V7 Labs. Data should be organized in `images` and `json` folders as such:
+This package is designed to be used with labeled data from [Darwin V7 Labs](https://www.v7labs.com/). Darwin V7 saves the labels of annotated data in the form of V7 JSON. Data should be organized in `images` and `json` folders as such:
 
 ```
 root/
@@ -15,9 +17,9 @@ root/
 │  ├─ image2.json
 ```
 
-Names for images and their associated labels should be the same save the file extension.
+Names for images and their associated labels must be the same, with the exception of the file extension. 
 
-If using a 3D semantic segmentation model, images sorted lexicographically are expected to be in order for a volume. Separate volumes should be in separate subfolders. Images should be in a `Im` subdirectory, and labels should be in a `L` subdirectory. Label files should have an extra `_L` appeneded to their file name. For instance:
+If using a 3D semantic segmentation model (i.e. `unet` or `fcdensenet`), images sorted lexicographically are expected to be in order for a volume. Separate volumes should be in separate subfolders. Images should be in a `Im` subdirectory, and labels should be in a `L` subdirectory. Label files should have an extra `_L` appeneded to their file name. For instance:
 
 ```
 root/
@@ -54,7 +56,7 @@ Generally, configurations should contain some key parameters:
 * **`gpu`**: The GPU to use when running the model. Use -1 for CPU only training.
 * **`model`**: The type of model to use. See [Available Models](#available-models) for a list of options.
 
-Additionally, each run should have one or more modes given as a command line argument. See [Usage](#usage) for available modes.
+Additionally, each run should have one or more modes given as a command line argument. Modes include `'train'`, `'apply'`, `'evaluate'`, and `'optimize'`. See [Usage](#usage) for more information on available modes.
 
 ### All Configuration Parameters
 

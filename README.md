@@ -41,9 +41,19 @@ root/
 │  │  ├─ zslice03_L.png
 ```
 
+## Usage
+
+```
+python main.py --mode gen_targets train --config configs/test_config.json
+```
+
 ## Configurations
 
-Configurations can be accessed in two ways, via command line flags or via [configuration files](#configuration-files).
+Configurations change the behavior and settings of the application, and can be modified in two ways, via command line flags or via [configuration files](#configuration-files). The order of configuration precedence is:
+
+1. Configurations set via command line flags
+2. Configurations set via a configuration file
+3. A set of default configurations (as shown in [All Configuration Parameters](#all-configuration-parameters))
 
 ### Key Configuration Parameters
 
@@ -54,7 +64,7 @@ Generally, configurations should contain some key parameters:
 * **`gpu`**: The GPU to use when running the model. Use -1 for CPU only training.
 * **`model`**: The type of model to use. See [Available Models](#available-models) for a list of options.
 
-Additionally, each run should have one or more modes given as a command line argument. See [Usage](#usage) for available modes.
+Additionally, each run should have one or more modes given as a command line argument. See [Detailed Usage](#detailed-usage) for available modes.
 
 ### All Configuration Parameters
 
@@ -72,7 +82,8 @@ Additionally, each run should have one or more modes given as a command line arg
   --test_dir TEST_DIR   Directory to test model on. Default: test
   --save SAVE           Directory to write saved model weights to. Subdirectories will be created for HPO runs. Default: saved
   --mode MODE [MODE ...]
-                        Mode to run. Available modes include 'train', 'apply', 'evaluate', and 'optimize'
+                        Mode to run. Available modes include 'train', 'apply', 'evaluate', 'optimize', 'gen_labels', 'augment',
+                        'gen_targets', 'image2npy', 'metrics', and 'stitch'
   --mp                  Whether or not to use multiprocessing. Only use if you are training with multiple GPUs or multiple nodes. Default:
                         False
   --nodes NODES         Number of nodes for multiprocessing. Only necessary if mp is set.
@@ -165,7 +176,7 @@ Any flags can also be included in a configuration file, a JSON file with key-val
 
 And would be run (e.g. for training) using `python main.py --config maskrcnn_test.json --mode train`
 
-## Usage
+## Detailed Usage
 
 The general workflow starts with preprocessing via generating target data, training the model, then evaluating or applying the model.
 
@@ -173,11 +184,13 @@ For improved results, we recommend using hyperparameter optimization to find the
 
 ### Generate Target Images
 
-The `gen_targets` mode is used to generate target data: images and associated .npy files containing the associated bubbles.
+The `gen_targets` mode is used to generate target data: images and associated .npy files containing the associated bubble masks and boxes.
 
 The `splits` configuration option, a list of 3 floats, is used to determine the [test, validation, train] splits of the data. It defaults to `[0.1, 0.2, 0.7]`. The images in each split are chosen randomly.
 
-`gen_targets` uses multiprocessing for accelerated runs. The number of jobs can be specified using the `jobs` configuration option.
+To designate specific images for use in the train, test, and validation sets, place these images in separate folders (each containing `images` and `json` folders), and use the `train_set`, `test_set`, and `val_set` configuration options. 
+
+`gen_targets` uses multiprocessing for accelerated runs. The number of threads utilized can be specified using the `jobs` configuration option.
 
 Images can also be patched using the `patch_size` command line argument during this step. This is 
 very useful for large images that may not easily fit in available RAM or GPU VRAM.
@@ -207,7 +220,7 @@ Various train-time augmentations can be added to greater vary the inputted data.
 
 ### Evaluate and Apply Model
 
-The `evaluate` mode runs the model on the test set of images, and outputs the resulting loss, Intersection over Union (IoU), and Mean Average Percision (mAP) scores.
+The `evaluate` mode runs the model on the test set of images, and outputs the resulting loss, Intersection over Union (IoU), and Mean Average Percision (mAP) scores. `evaluate` is effectively a call to `apply` followed by a call to `metrics`.
 
 The `apply` mode runs the model on a set of unlabeled images. This mode can also be used to apply the model to a video file, where the model is run on each frame separately. Use the `video` configuration option to run on one video, or `video_dir` to run on a directory of videos.
 
@@ -215,7 +228,7 @@ To only obtain metrics for generated outputs, use the `metrics` mode.
 
 ### Perform Hyperparameter Optimization
 
-Hyperparameter optimization (HPO) enables the model to search a range for many different preprocessing and training hyperparameters to find the best options. Use the `optimize` mode to run HPO.
+Hyperparameter optimization (HPO) enables the utility to find a combination of parameters, such as learning rate, number of epochs, and batch size, that provide the best model performance. HPO is run using the `optimize` mode, and requires minimum and maximum values to search between for some parameters, and a list of options to choose from for others.
 
 When creating a HPO configuration, the following arguments should have two values for the minimum and maximum values respectively:
 * `lr`

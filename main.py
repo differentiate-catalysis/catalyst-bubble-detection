@@ -205,7 +205,7 @@ if __name__ == '__main__':
     parser.add_argument('--momentum', type=float, nargs='*', help='Momentum for SGD. Default: %s' % defaults['momentum'])
     parser.add_argument('--test_dir', type=str, help='Directory to test model on. Default: %s' % defaults['test_dir'])
     parser.add_argument('--save', type=str, help='Directory to write saved model weights to. Subdirectories will be created for HPO runs. Default: %s' % defaults['save'])
-    parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Available modes include \'train\', \'apply\', \'evaluate\', and \'optimize\'')
+    parser.add_argument('--mode', type=str, nargs='+', help='Mode to run. Available modes include \'train\', \'apply\', \'evaluate\', \'optimize\', \'gen_labels\', \'augment\', \'gen_targets\', \'image2npy\', \'metrics\', and \'stitch\'')
     parser.add_argument('--mp', action='store_true', help='Whether or not to use multiprocessing. Only use if you are training with multiple GPUs or multiple nodes. Default: %s' % defaults['mp'])
     parser.add_argument('--nodes', type=int, help='Number of nodes for multiprocessing. Only necessary if mp is set.')
     parser.add_argument('--nr', type=int, help='Index of the current node\'s first rank. Only necessary if mp is set.')

@@ -1,9 +1,11 @@
 # catalyst-bubble-detection
-Detect bubbles that are evolving gas from a catalyst surface to determine reaction activity. This can be used for screening catalysts to choose the most optimal.
+
+The `catalyst-bubble-detection` project aims to use ML to detect bubbles in high-throughput microscope images of catalyst surfaces. This repo contains the full ML pipeline for training, testing, evaluating, and optimizing ML models for bubble detection. The goal of this work is to screen catalysts to choose the most optimal one for a given gaseous reaction (e.g. oxygen evolution and oxygen reduction reactions).
+
 
 ## Data Setup
 
-The package is designed to be used with labeled data from Darwin V7 Labs. Data should be organized in `images` and `json` folders as such:
+This package is designed to be used with labeled data from [Darwin V7 Labs](https://www.v7labs.com/). Darwin V7 saves the labels of annotated data in the form of V7 JSON. Data should be organized in `images` and `json` folders as such:
 
 ```
 root/
@@ -15,9 +17,9 @@ root/
 │  ├─ image2.json
 ```
 
-Names for images and their associated labels should be the same save the file extension.
+Names for images and their associated labels must be the same, with the exception of the file extension. 
 
-If using a 3D semantic segmentation model, images sorted lexicographically are expected to be in order for a volume. Separate volumes should be in separate subfolders. Images should be in a `Im` subdirectory, and labels should be in a `L` subdirectory. Label files should have an extra `_L` appeneded to their file name. For instance:
+If using a 3D semantic segmentation model (i.e. `unet` or `fcdensenet`), images sorted lexicographically are expected to be in order for a volume. Separate volumes should be in separate subfolders. Images should be in a `Im` subdirectory, and labels should be in a `L` subdirectory. Label files should have an extra `_L` appeneded to their file name. For instance:
 
 ```
 root/
@@ -49,7 +51,7 @@ python main.py --mode gen_targets train --config configs/test_config.json
 
 ## Configurations
 
-Configurations change the behavior and settings of the application, and can be modified in two ways, via command line flags or via [configuration files](#configuration-files). The order of configuration precedence is:
+Configurations change the behavior and settings of the application, and can be set in two ways, via command line flags or via [configuration files](#configuration-files). The order of configuration precedence is:
 
 1. Configurations set via command line flags
 2. Configurations set via a configuration file
@@ -64,7 +66,7 @@ Generally, configurations should contain some key parameters:
 * **`gpu`**: The GPU to use when running the model. Use -1 for CPU only training.
 * **`model`**: The type of model to use. See [Available Models](#available-models) for a list of options.
 
-Additionally, each run should have one or more modes given as a command line argument. See [Detailed Usage](#detailed-usage) for available modes.
+Additionally, each run should have one or more modes given as a command line argument. Most commonly used modes include `'train'`, `'apply'`, `'evaluate'`, and `'optimize'`. See [Detailed Usage](#detailed-usage) for more information on available modes.
 
 ### All Configuration Parameters
 
@@ -153,7 +155,7 @@ Additionally, each run should have one or more modes given as a command line arg
 
 ### Configuration Files
 
-Any flags can also be included in a configuration file, a JSON file with key-value pairs for each flag and its associated value. This can then be used with the `--config` flag at runtime. For instance, an example `maskrcnn_test.json` may contain the following:
+Any flags can also be included in a configuration file. The configuration file is a JSON file with key-value pairs for each flag and its associated value. This can then be used with the `--config` flag at runtime. For instance, an example `maskrcnn_test.json` config may contain the following:
 
 ```
 {
@@ -174,17 +176,21 @@ Any flags can also be included in a configuration file, a JSON file with key-val
 }
 ```
 
-And would be run (e.g. for training) using `python main.py --config maskrcnn_test.json --mode train`
+This can be run (e.g. for training) using 
+
+```
+python main.py --config maskrcnn_test.json --mode train
+```
 
 ## Detailed Usage
 
-The general workflow starts with preprocessing via generating target data, training the model, then evaluating or applying the model.
+The general workflow starts with preprocessing via generating target data, training the model, then evaluating or applying (e.g. running inference with) the model.
 
-For improved results, we recommend using hyperparameter optimization to find the optimal parameters for each given run. 
+For improved results, we recommend using hyperparameter optimization (HPO) to find the optimal parameters for each given run. 
 
 ### Generate Target Images
 
-The `gen_targets` mode is used to generate target data: images and associated .npy files containing the associated bubble masks and boxes.
+The `gen_targets` mode is used to generate target data for model training: images and associated .npy files containing the associated bubble masks and boxes.
 
 The `splits` configuration option, a list of 3 floats, is used to determine the [test, validation, train] splits of the data. It defaults to `[0.1, 0.2, 0.7]`. The images in each split are chosen randomly.
 
@@ -257,8 +263,10 @@ Various other modes are available as well:
 ### Instance Segmentation
 
 ```
-maskrcnn
-fasterrcnn
+mask_rcnn
+faster_rcnn
+retina_net
+simclr_faster_rcnn
 ```
 
 ### Semantic Segmentation

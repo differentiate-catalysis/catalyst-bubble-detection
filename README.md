@@ -176,17 +176,21 @@ Any flags can also be included in a configuration file. The configuration file i
 }
 ```
 
-This can be run (e.g. for training) using 
-
-```
-python main.py --config maskrcnn_test.json --mode train
-```
-
 ## Detailed Usage
 
 The general workflow starts with preprocessing via generating target data, training the model, then evaluating or applying (e.g. running inference with) the model.
 
-For improved results, we recommend using hyperparameter optimization (HPO) to find the optimal parameters for each given run. 
+Generally, most configuration parameters for all modes needed for a specific run are added to one configuration file. We provide a sample configuration file in `configs/sample.json` that shows the usage of many of the different configurations. A run using this configuration would then look like:
+
+```
+python main.py --config configs/sample.json --mode <mode or list of modes>
+```
+
+For improved results, we recommend using hyperparameter optimization (HPO) to find the optimal parameters for each given run. A sample configuration file demonstrating the different options for HPO is shown in `configs/sample_HPO.json`, which can then be run using:
+
+```
+python main.py --config configs/sample_HPO.json --mode optimize
+```
 
 ### Generate Target Images
 
@@ -198,8 +202,8 @@ To designate specific images for use in the train, test, and validation sets, pl
 
 `gen_targets` uses multiprocessing for accelerated runs. The number of threads utilized can be specified using the `jobs` configuration option.
 
-Images can also be patched using the `patch_size` command line argument during this step. This is 
-very useful for large images that may not easily fit in available RAM or GPU VRAM.
+Images can also be patched using the `patch_size` configuration option during this step. This is 
+very useful for large images that may not easily fit in available RAM or GPU VRAM. Not including a patch size, or setting the patch_size to -1, will not split the image into patches.
 
 `gen_targets` will often prompt the user, for instance if previous generated data will be overwritten. This can be bypassed with the `--no-prompt` command line argument or setting the `prompt` configuration option to `False`.
 
@@ -224,6 +228,8 @@ Various train-time augmentations can be added to greater vary the inputted data.
 * `clahe` (Contrast Limited Adaptive Histogram Equalization)
 * `contrast_stretch`
 
+Training can also be done starting with a previous checkpoint file with pretrained weights. The `checkpoint` configuration option enables the use of pretrained weights. An example of using a checkpoint is shown in `configs/sample_HPO.json`.
+
 ### Evaluate and Apply Model
 
 The `evaluate` mode runs the model on the test set of images, and outputs the resulting loss, Intersection over Union (IoU), and Mean Average Percision (mAP) scores. `evaluate` is effectively a call to `apply` followed by a call to `metrics`.
@@ -247,7 +253,7 @@ When creating a HPO configuration, the following arguments should have two value
 
 The `model` and `opt` arguments should be a list of different options for models and optimizers, respectively. Augmentations will be sampled from all augmentations listed in the `transforms` option.
 
-The best option will be selected based on the best mAP score.
+The best option will be selected based on the best mAP score. The script generates a subdirectory within the `saved` directory with the best model stored as `best.pth`, and the associated configuration file saved as `best.json`.
 
 ### Miscellaneous Mode Options
 

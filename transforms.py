@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
+from kornia.enhance import adjust_log, equalize_clahe
 from skimage import exposure
 from torch.nn import Module
 
@@ -21,8 +22,13 @@ class Compose(Module):
 
 
 class ToTensor(Module):
+    def __init__(self, gpu: int = None):
+        if gpu is not None:
+            self.device = f"cuda:{gpu}"
+        else:
+            self.device = "cpu"
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = F.to_tensor(image)
+        image = F.to_tensor(image).to(device = self.device)
         return image, target
 
 
@@ -230,34 +236,42 @@ class Normalize(T.Normalize):
 
 class LogGamma(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image_np = image.numpy()
-        for c in range(image_np.shape[0]):
-            image_np[c] = exposure.adjust_log(image_np[c], 1)
-        image = torch.from_numpy(image_np)
+        image = adjust_log(image)
         return image, target
 
 
 class CLAHE(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image_np = image.permute((1, 2, 0)).numpy()
-        image_np = exposure.equalize_adapthist(image_np)
-        image = torch.from_numpy(image_np).permute((2, 0, 1))
-        return image, target
+        image = image / torch.max(image)
+        image = image.permute(2, 0, 1)
+        return equalize_clahe(image, clip_limit=5., grid_size=(4,4)).permute(1, 2, 0), target
 
 
-class ContrastStretch(Module):
+class ContrastStretchInt(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image_np = image.permute((1, 2, 0)).numpy()
-        p2, p98 = np.percentile(image_np, (2, 98))
-        image_np = exposure.rescale_intensity(image_np, in_range=(p2, p98))
-        image = torch.from_numpy(image_np).permute((2, 0, 1))
+        q = torch.Tensor([0.02, 0.98])
+        p2, p98 = torch.quantile(image, q)
+        image = image.clip(p2, p98)
+        image -= p2
+        image /= (p98 - p2)
+        image *= 255
+        return image.int(), target
+
+class ContrastStretchFloat(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        q = torch.Tensor([0.02, 0.98])
+        p2, p98 = torch.quantile(image, q)
+        image = image.clip(p2, p98)
+        image -= p2
+        image /= (p98 - p2)
         return image, target
 
 
 transform_mappings = {
     'log_gamma': LogGamma(),
     'clahe': CLAHE(),
-    'contrast_stretch': ContrastStretch(),
+    'contrast_stretch_float': ContrastStretchFloat(),
+    'contrast_stretch_int': ContrastStretchInt(),
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),

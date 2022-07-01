@@ -259,7 +259,7 @@ def gen_targets(args):
     parsl.clear()
 
 def apply_transforms(args):
-    transform_compose = get_transforms(True, args.transforms)
+    transform_compose = get_transforms(True, args.transforms, args.gpu)
     images = [os.path.join(args.root, f) for f in os.listdir(args.root) if os.path.isfile(os.path.join(args.root, f))]
     for image_file in tqdm(images):
         image = Image.open(image_file).convert(mode='RGB')

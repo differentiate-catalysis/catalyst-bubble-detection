@@ -2,6 +2,13 @@
 
 The `catalyst-bubble-detection` project aims to use ML to detect bubbles in high-throughput microscope images of catalyst surfaces. This repo contains the full ML pipeline for training, testing, evaluating, and optimizing ML models for bubble detection. The goal of this work is to screen catalysts to choose the most optimal one for a given gaseous reaction (e.g. oxygen evolution and oxygen reduction reactions).
 
+## Installation
+
+```
+pip install -r requirements.txt
+```
+
+The install installs PyTorch 1.8.2 and Torchvision 0.9.2 (latest LTS release), and other required packages.
 
 ## Data Setup
 

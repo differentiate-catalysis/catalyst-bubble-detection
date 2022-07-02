@@ -255,7 +255,7 @@ def gen_targets(args):
         random.shuffle(split_numbers)
         for image_name in os.listdir(image_root):
             workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, args.split, rand_num=split_numbers.pop()))
-    else:
+    else: #No specified sets, should randomly assign using given splits
         for t, split_dir in enumerate([args.test_set, args.val_set, args.train_set]):
             if split_dir:
                 image_root = os.path.join(split_dir, 'images')

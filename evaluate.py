@@ -59,6 +59,7 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         target_boxes = []
         output_list = []
         target_list = []
+        has_target = False
         # Check if the dataset has labels. This doesn't apply for VideoDatasets
         if isinstance(valid_loader.dataset, Dataset) and len(valid_loader) > 0:
             _, targets = next(iter((valid_loader)))

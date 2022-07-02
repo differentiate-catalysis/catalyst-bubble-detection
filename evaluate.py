@@ -58,7 +58,10 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         num_samples = valid_loader.batch_size * len(valid_loader)
         if num_samples == 0:
             print("WARNING: Validation skipped (likely because the number of validations patches < batch size)")
-            return 0
+            if test:
+                return 0
+            else:
+                return (0, 0, 0)
         target_boxes = []
         output_list = []
         target_list = []

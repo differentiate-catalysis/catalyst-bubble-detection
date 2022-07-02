@@ -56,10 +56,12 @@ def evaluate(model: Module, valid_loader: DataLoader, amp: bool, gpu: int, save_
         model.eval()
         total_loss = 0
         num_samples = valid_loader.batch_size * len(valid_loader)
+        if num_samples == 0:
+            print("WARNING: Validation skipped (likely because the number of validations patches < batch size)")
+            return 0
         target_boxes = []
         output_list = []
         target_list = []
-        has_target = False
         # Check if the dataset has labels. This doesn't apply for VideoDatasets
         if isinstance(valid_loader.dataset, Dataset) and len(valid_loader) > 0:
             _, targets = next(iter((valid_loader)))

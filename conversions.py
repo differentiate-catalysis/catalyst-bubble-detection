@@ -248,12 +248,22 @@ def gen_targets(args):
             os.mkdir(target_output_dir)
         if not os.path.isdir(image_output_dir):
             os.mkdir(image_output_dir)
-    random.seed(8995)
-    num_images = len(os.listdir(image_root))
-    split_numbers = [i / num_images for i in range(num_images)]
-    random.shuffle(split_numbers)
-    for image_name in os.listdir(image_root):
-        workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, args.split, rand_num=split_numbers.pop()))
+    if not (args.train_set or args.val_set or args.test_set):
+        random.seed(8995)
+        num_images = len(os.listdir(image_root))
+        split_numbers = [i / num_images for i in range(num_images)]
+        random.shuffle(split_numbers)
+        for image_name in os.listdir(image_root):
+            workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, args.split, rand_num=split_numbers.pop()))
+    else: #No specified sets, should randomly assign using given splits
+        for t, split_dir in enumerate([args.test_set, args.val_set, args.train_set]):
+            if split_dir:
+                image_root = os.path.join(split_dir, 'images')
+                json_root = os.path.join(split_dir, 'json')
+                for image_name in os.listdir(image_root):
+                    splits_sub = [0, 0, 0]
+                    splits_sub[t] = 1
+                    workers.append(convert_to_targets(image_root, json_root, trial_dir, image_name, args.patch_size, splits_sub, 0.1))
     for worker in tqdm(workers):
         result = worker.result()
     parsl.clear()

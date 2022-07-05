@@ -1,0 +1,17 @@
+{
+    "name": "fasterrcnn_test",
+    "root": "data/sample",
+    "splits": [0.1, 0.25, 0.65],
+    "patch_size": -1,
+    "jobs": 4,
+    "prompt": false,
+    "model": "faster_rcnn",
+    "lr": 1e-04,
+    "opt": "adam",
+    "epoch": 15,
+    "mp": false,
+    "amp": true,
+    "batch_size": 8,
+    "transforms": ["horizontal_flip", "gray_balance_adjust", "blur", "sharpness", "vertical_flip", "rotation"],
+    "gpu": 0
+}

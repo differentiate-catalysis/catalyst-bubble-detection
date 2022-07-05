@@ -1,0 +1,22 @@
+{
+    "root": "data/sample",
+    "models": ["faster_rcnn"],
+    "optimizers": ["adam", "sgd"],
+    "lr": [0.000001, 0.1],
+    "momentum": [0.7, 0.95],
+    "epoch": [5, 20],
+    "patch_size": [-1, -1],
+    "batch_size": [1, 4],
+    "gamma": [0.000001, 0.001],
+    "num_samples": 200,
+    "jobs": 40,
+    "transforms": ["rotation", "horizontal_flip", "vertical_flip", "gray_balance_adjust", "blur", "sharpness"],
+    "gpu": 8,
+    "amp": true,
+    "prompt": false,
+    "aug": true,
+    "resume": false,
+    "checkpoint": "saved/previous_train/best.pth",
+    "name": "sample_finetuning_hpo",
+    "graph": true
+}

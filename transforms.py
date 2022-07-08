@@ -23,13 +23,13 @@ class Compose(Module):
 
 
 class ToTensor(Module):
-    def __init__(self, gpu: int = None):
-        if gpu is not None:
+    def __init__(self, gpu: int = -1):
+        if gpu != -1:
             self.device = f"cuda:{gpu}"
         else:
             self.device = "cpu"
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = F.to_tensor(image).to(device = self.device)
+        image = F.to_tensor(image).to(device=self.device)
         return image, target
 
 
@@ -237,7 +237,7 @@ class Normalize(T.Normalize):
 
 class LogGamma(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = adjust_log(image)
+        image = adjust_log(image)  # Runs Log Adjustment through kornia.
         return image, target
 
 
@@ -253,9 +253,14 @@ class CLAHE(Module):
 
 class ContrastStretchInt(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        # Compute the 2nd and 98th percentiles
         q = torch.Tensor([0.02, 0.98])
         p2, p98 = torch.quantile(image, q)
+
+        # Clip the image to these percentiles
         image = image.clip(p2, p98)
+
+        # Stretch the image back to 0..255
         image -= p2
         image /= (p98 - p2)
         image *= 255
@@ -263,9 +268,14 @@ class ContrastStretchInt(Module):
 
 class ContrastStretchFloat(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        # Compute the 2nd and 98th percentiles
         q = torch.Tensor([0.02, 0.98])
         p2, p98 = torch.quantile(image, q)
+
+        # Clip the image to these percentiles
         image = image.clip(p2, p98)
+
+        # Stretch the image back to 0..1
         image -= p2
         image /= (p98 - p2)
         return image, target

@@ -108,7 +108,7 @@ def compute_mean_and_std_video(data_root: str, video_file: str, image_size: Tupl
 
 def get_transforms(training: bool, transforms: List[str], gpu: int) -> Compose:
     composition = []
-    composition.append(ToTensor() if gpu == -1 else ToTensor(gpu))
+    composition.append(ToTensor(gpu))  # When gpu == -1, this will run on CPU.
     # composition.append(CLAHE())
     # composition.append(AutoExpose())
     if training and transforms:

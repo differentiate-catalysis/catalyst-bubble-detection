@@ -6,6 +6,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 from kornia.enhance import adjust_log, equalize_clahe
+from kornia.color import rgb_to_hsv, hsv_to_rgb
 from skimage import exposure
 from torch.nn import Module
 
@@ -242,9 +243,12 @@ class LogGamma(Module):
 
 class CLAHE(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = image / torch.max(image)
+        image = image / 255
         image = image.permute(2, 0, 1)
-        return equalize_clahe(image, clip_limit=5., grid_size=(4,4)).permute(1, 2, 0), target
+        image = rgb_to_hsv(image, eps=1e-08)
+        image[2] = equalize_clahe(image[2], clip_limit=1.5, grid_size=(4,4))
+        image = hsv_to_rgb(image)
+        return image.permute(1, 2, 0)
 
 
 class ContrastStretchInt(Module):

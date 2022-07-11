@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
+from kornia.enhance import adjust_log, equalize_clahe
+from kornia.color import rgb_to_hsv, hsv_to_rgb
 from skimage import exposure
 from torch.nn import Module
 
@@ -21,8 +23,13 @@ class Compose(Module):
 
 
 class ToTensor(Module):
+    def __init__(self, gpu: int = -1):
+        if gpu != -1:
+            self.device = f"cuda:{gpu}"
+        else:
+            self.device = "cpu"
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = F.to_tensor(image)
+        image = F.to_tensor(image).to(device=self.device)
         return image, target
 
 
@@ -230,34 +237,55 @@ class Normalize(T.Normalize):
 
 class LogGamma(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image_np = image.numpy()
-        for c in range(image_np.shape[0]):
-            image_np[c] = exposure.adjust_log(image_np[c], 1)
-        image = torch.from_numpy(image_np)
+        image = adjust_log(image)  # Runs Log Adjustment through kornia.
         return image, target
 
 
 class CLAHE(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image_np = image.permute((1, 2, 0)).numpy()
-        image_np = exposure.equalize_adapthist(image_np)
-        image = torch.from_numpy(image_np).permute((2, 0, 1))
-        return image, target
+        image = image / torch.max(image)  # Scale the pixel values down to 0..1
+        image = image.permute(2, 0, 1)  # Permute the image to CxHxW from HxWxC
+        image = rgb_to_hsv(image, eps=1e-08)  # Convert to HSV so that we only scale the Value Channel (avoids noise)
+        image[2] = equalize_clahe(image[2], clip_limit=1.5, grid_size=(4,4))
+        image = hsv_to_rgb(image)  # Convert back to RGB
+        return image.permute(1, 2, 0)  # Convert bck to HxWxC
 
 
-class ContrastStretch(Module):
+class ContrastStretchInt(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image_np = image.permute((1, 2, 0)).numpy()
-        p2, p98 = np.percentile(image_np, (2, 98))
-        image_np = exposure.rescale_intensity(image_np, in_range=(p2, p98))
-        image = torch.from_numpy(image_np).permute((2, 0, 1))
+        # Compute the 2nd and 98th percentiles of the pixel values
+        q = torch.Tensor([0.02, 0.98])
+        p2, p98 = torch.quantile(image, q)
+
+        # Clip the image to these percentiles
+        image = image.clip(p2, p98)
+
+        # Stretch the image back to 0..255 pixel values
+        image -= p2
+        image /= (p98 - p2)
+        image *= 255
+        return image.int(), target
+
+class ContrastStretchFloat(Module):
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        # Compute the 2nd and 98th percentiles of the pixel values
+        q = torch.Tensor([0.02, 0.98])
+        p2, p98 = torch.quantile(image, q)
+
+        # Clip the image to these percentiles
+        image = image.clip(p2, p98)
+
+        # Stretch the image back to 0..1 pixel values
+        image -= p2
+        image /= (p98 - p2)
         return image, target
 
 
 transform_mappings = {
     'log_gamma': LogGamma(),
     'clahe': CLAHE(),
-    'contrast_stretch': ContrastStretch(),
+    'contrast_stretch_float': ContrastStretchFloat(),
+    'contrast_stretch_int': ContrastStretchInt(),
     'horizontal_flip': RandomHorizontalFlip(0.5),
     'vertical_flip': RandomVerticalFlip(0.5),
     'rotation': RandomRotation(80),

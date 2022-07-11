@@ -11,6 +11,9 @@ from parsl import python_app
 from parsl.config import Config
 from parsl.executors.threads import ThreadPoolExecutor
 from PIL import Image, ImageDraw
+from typing import Dict, List, Optional, Tuple
+import torchvision.transforms.functional as F
+
 import cv2
 
 from transforms import target_from_masks
@@ -258,8 +261,17 @@ def gen_targets(args):
         result = worker.result()
     parsl.clear()
 
+class ToTensorGPU():
+    def init(self, gpu: int):
+        self.gpu = gpu
+    def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
+        image = F.to_tensor(image).to(device=f'cuda:{self.gpu}')
+        return image, target
+
 def apply_transforms(args):
-    transform_compose = get_transforms(True, args.transforms, args.gpu)
+    transform_compose = get_transforms(True, args.transforms)
+    if (args.gpu!=-1):
+        transform_compose.transforms[0] = ToTensorGPU(args.gpu)
     images = [os.path.join(args.root, f) for f in os.listdir(args.root) if os.path.isfile(os.path.join(args.root, f))]
     for image_file in tqdm(images):
         image = Image.open(image_file).convert(mode='RGB')

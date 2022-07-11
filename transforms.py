@@ -243,24 +243,24 @@ class LogGamma(Module):
 
 class CLAHE(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = image / 255
-        image = image.permute(2, 0, 1)
-        image = rgb_to_hsv(image, eps=1e-08)
+        image = image / torch.max(image)  # Scale the pixel values down to 0..1
+        image = image.permute(2, 0, 1)  # Permute the image to CxHxW from HxWxC
+        image = rgb_to_hsv(image, eps=1e-08)  # Convert to HSV so that we only scale the Value Channel (avoids noise)
         image[2] = equalize_clahe(image[2], clip_limit=1.5, grid_size=(4,4))
-        image = hsv_to_rgb(image)
-        return image.permute(1, 2, 0)
+        image = hsv_to_rgb(image)  # Convert back to RGB
+        return image.permute(1, 2, 0)  # Convert bck to HxWxC
 
 
 class ContrastStretchInt(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        # Compute the 2nd and 98th percentiles
+        # Compute the 2nd and 98th percentiles of the pixel values
         q = torch.Tensor([0.02, 0.98])
         p2, p98 = torch.quantile(image, q)
 
         # Clip the image to these percentiles
         image = image.clip(p2, p98)
 
-        # Stretch the image back to 0..255
+        # Stretch the image back to 0..255 pixel values
         image -= p2
         image /= (p98 - p2)
         image *= 255
@@ -268,14 +268,14 @@ class ContrastStretchInt(Module):
 
 class ContrastStretchFloat(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        # Compute the 2nd and 98th percentiles
+        # Compute the 2nd and 98th percentiles of the pixel values
         q = torch.Tensor([0.02, 0.98])
         p2, p98 = torch.quantile(image, q)
 
         # Clip the image to these percentiles
         image = image.clip(p2, p98)
 
-        # Stretch the image back to 0..1
+        # Stretch the image back to 0..1 pixel values
         image -= p2
         image /= (p98 - p2)
         return image, target

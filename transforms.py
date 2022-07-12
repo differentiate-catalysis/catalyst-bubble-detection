@@ -23,13 +23,8 @@ class Compose(Module):
 
 
 class ToTensor(Module):
-    def __init__(self, gpu: int = -1):
-        if gpu != -1:
-            self.device = f"cuda:{gpu}"
-        else:
-            self.device = "cpu"
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        image = F.to_tensor(image).to(device=self.device)
+        image = F.to_tensor(image)
         return image, target
 
 

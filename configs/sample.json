@@ -1,6 +1,6 @@
 {
     "name": "fasterrcnn_test",
-    "root": "data/sample",
+    "root": "data/iro2",
     "splits": [0.1, 0.25, 0.65],
     "patch_size": -1,
     "jobs": 4,

@@ -17,9 +17,12 @@ class Compose(Module):
         self.transforms = torch.nn.ModuleList(transforms)
 
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
-        for t in self.transforms:
-            image, target = t(image, target)
-        return image, target
+        if target:
+            for t in self.transforms:
+                image, target = t(image, target)
+            return image, target
+        else:
+            return image
 
 
 class ToTensor(Module):

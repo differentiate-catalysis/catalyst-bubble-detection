@@ -23,7 +23,7 @@ class Compose(Module):
             return image, target
         else:
             for t in self.transforms:
-                image = t(image)
+                image, _ = t(image)
             return image, None
 
 

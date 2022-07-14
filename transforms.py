@@ -244,11 +244,10 @@ class LogGamma(Module):
 class CLAHE(Module):
     def forward(self, image: torch.Tensor, target: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Optional[Dict[str, torch.Tensor]]]:
         image = image / torch.max(image)  # Scale the pixel values down to 0..1
-        image = image.permute(2, 0, 1)  # Permute the image to CxHxW from HxWxC
         image = rgb_to_hsv(image, eps=1e-08)  # Convert to HSV so that we only scale the Value Channel (avoids noise)
         image[2] = equalize_clahe(image[2], clip_limit=1.5, grid_size=(4,4))
         image = hsv_to_rgb(image)  # Convert back to RGB
-        return image.permute(1, 2, 0), target  # Convert bck to HxWxC
+        return image, target
 
 
 class ContrastStretchInt(Module):

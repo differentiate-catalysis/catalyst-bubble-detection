@@ -22,7 +22,7 @@ class Compose(Module):
                 image, target = t(image, target)
             return image, target
         else:
-            return image
+            return image, None
 
 
 class ToTensor(Module):

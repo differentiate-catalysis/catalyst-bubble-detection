@@ -248,7 +248,7 @@ class CLAHE(Module):
         image = rgb_to_hsv(image, eps=1e-08)  # Convert to HSV so that we only scale the Value Channel (avoids noise)
         image[2] = equalize_clahe(image[2], clip_limit=1.5, grid_size=(4,4))
         image = hsv_to_rgb(image)  # Convert back to RGB
-        return image.permute(1, 2, 0)  # Convert bck to HxWxC
+        return image.permute(1, 2, 0), target  # Convert bck to HxWxC
 
 
 class ContrastStretchInt(Module):

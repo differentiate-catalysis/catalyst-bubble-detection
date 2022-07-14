@@ -22,6 +22,8 @@ class Compose(Module):
                 image, target = t(image, target)
             return image, target
         else:
+            for t in self.transforms:
+                image = t(image)
             return image, None
 
 

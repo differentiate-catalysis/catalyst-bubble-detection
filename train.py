@@ -137,8 +137,6 @@ def train_model(gpu: int, args: SimpleNamespace):
             print('Possible overfitting, stopping early.')
             break
 
-        print(model.roi_heads.detections_per_img)
-
         # Update last losses
         last_loss_train = loss_train
         last_loss_eval = last_loss_eval

@@ -5,7 +5,8 @@ from typing import List, Optional
 
 import torch
 from torch.nn import Module
-from torchvision.models.detection import fasterrcnn_resnet50_fpn, maskrcnn_resnet50_fpn
+from torchvision.models.detection import fasterrcnn_resnet50_fpn, maskrcnn_resnet50_fpn, fasterrcnn_resnet50_fpn_v2, maskrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_Weights, FasterRCNN_ResNet50_FPN_V2_Weights, MaskRCNN_ResNet50_FPN_V2_Weights, MaskRCNN_ResNet50_FPN_Weights
+
 from torchvision.models.detection.backbone_utils import _validate_trainable_layers, BackboneWithFPN
 from torchvision.models.detection.faster_rcnn import FasterRCNN, FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNN, MaskRCNNPredictor
@@ -50,11 +51,13 @@ def resnet_fpn_backbone(
     return BackboneWithFPN(backbone, return_layers, in_channels_list, out_channels, extra_blocks=extra_blocks)
 
 
-def faster_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> FasterRCNN:
+def faster_rcnn(detections_per_img: int, image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> FasterRCNN:
     '''
     Instantiates a COCO pre-trained FasterRCNN with 2 output classes, allowing for custom normalization constants.
     Parameters
     ----------
+    detections_per_img: int
+        Number of regions of interest produced by the RoI heads
     image_mean: Optiona[List[float]]
         List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
     image_std: Optional[List[float]]
@@ -64,17 +67,44 @@ def faster_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[floa
     model
         The requested FasterRCNN model
     '''
-    model = fasterrcnn_resnet50_fpn(pretrained=True, image_mean=image_mean, image_std=image_std)
+    model = fasterrcnn_resnet50_fpn(weights=FasterRCNN_ResNet50_FPN_Weights.COCO_V1, image_mean=image_mean, image_std=image_std)
+    model.roi_heads.detections_per_img = detections_per_img
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 2)
     return model
 
 
-def mask_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> MaskRCNN:
+def faster_rcnn_v2(detections_per_img: int, image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> FasterRCNN:
+    '''
+    Instantiates a COCO pre-trained FasterRCNN with 2 output classes, allowing for custom normalization constants. Uses improved weights (v2)
+
+    Parameters
+    ----------
+    detections_per_img: int
+        Number of regions of interest produced by the RoI heads
+    image_mean: Optiona[List[float]]
+        List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
+    image_std: Optional[List[float]]
+        List of 3 values from 0 to 1, describing the standard deviation R, G, and B values of images in the dataset
+    Returns
+    -------
+    model
+        The requested FasterRCNN model
+    '''
+    model = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1, image_mean=image_mean, image_std=image_std)
+    model.roi_heads.detections_per_img = detections_per_img
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 2)
+    return model
+
+
+def mask_rcnn(detections_per_img: int, image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> MaskRCNN:
     '''
     Instantiates a COCO pre-trained MaskRCNN with 2 output classes, allowing for custom normalization constants.
     Parameters
     ----------
+    detections_per_img: int
+        Number of regions of interest produced by the RoI heads
     image_mean: Optiona[List[float]]
         List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
     image_std: Optional[List[float]]
@@ -84,7 +114,34 @@ def mask_rcnn(image_mean: Optional[List[float]], image_std: Optional[List[float]
     model
         The requested MaskRCNN model
     '''
-    model = maskrcnn_resnet50_fpn(pretrained=True, image_mean=image_mean, image_std=image_std)
+    model = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.COCO_V1, image_mean=image_mean, image_std=image_std)
+    model.roi_heads.detections_per_img = detections_per_img
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 2)
+    in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
+    hidden_layer = 256
+    model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer, 2)
+    return model
+
+
+def mask_rcnn_v2(detections_per_img: int, image_mean: Optional[List[float]], image_std: Optional[List[float]]) -> MaskRCNN:
+    '''
+    Instantiates a COCO pre-trained MaskRCNN with 2 output classes, allowing for custom normalization constants. Uses improved weights (v2)
+    Parameters
+    ----------
+    detections_per_img: int
+        Number of regions of interest produced by the RoI heads
+    image_mean: Optiona[List[float]]
+        List of 3 values from 0 to 1, describing the average R, G, and B values of images in the dataset
+    image_std: Optional[List[float]]
+        List of 3 values from 0 to 1, describing the standard deviation R, G, and B values of images in the dataset
+    Returns
+    -------
+    model
+        The requested MaskRCNN model
+    '''
+    model = maskrcnn_resnet50_fpn_v2(weights=MaskRCNN_ResNet50_FPN_V2_Weights.COCO_V1, image_mean=image_mean, image_std=image_std)
+    model.roi_heads.detections_per_img = detections_per_img
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 2)
     in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
@@ -174,14 +231,16 @@ def model_mappings(args: SimpleNamespace) -> Module:
         std = None
     model_map = {
         'simclr_faster_rcnn': simclr_faster_rcnn(mean, std, args.simclr_checkpoint),
-        'faster_rcnn': faster_rcnn(mean, std),
-        'mask_rcnn': mask_rcnn(mean, std),
+        'faster_rcnn': faster_rcnn(args.detections_per_img, mean, std),
+        'faster_rcnn_v2': faster_rcnn_v2(args.detections_per_img, mean, std),
+        'mask_rcnn': mask_rcnn(args.detections_per_img, mean, std),
+        'mask_rcnn_v2': mask_rcnn_v2(args.detections_per_img, mean, std),
         'retina_net': retina_net(mean, std),
     }
     return model_map[args.model]
 
 
-model_keys = set(['faster_rcnn', 'mask_rcnn', 'retina_net', 'simclr_faster_rcnn'])
+model_keys = set(['faster_rcnn', 'mask_rcnn', 'retina_net', 'simclr_faster_rcnn', 'mask_rcnn_v2', 'faster_rcnn_v2'])
 
 
 if __name__ == '__main__':

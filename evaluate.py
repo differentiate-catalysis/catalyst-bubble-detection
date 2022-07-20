@@ -163,7 +163,7 @@ def get_metrics(outputs: List[Dict], targets: List[Dict], dataset: Dataset) -> T
     stats = coco_evaluator.summarize()
 
     image, _ = dataset[0]
-    width, height = F._get_image_size(image)
+    width, height = F.get_image_size(image)
     ious = []
     for target, output in zip(targets, outputs):
         target_mask = torch.zeros((height, width), dtype=torch.uint8)

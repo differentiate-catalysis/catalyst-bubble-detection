@@ -119,7 +119,7 @@ Additionally, each run should have one or more modes given as a command line arg
   --graph               Whether or not to save a plot of the results
   --run_dir RUN_DIR     Directory to use for parsl
   --loss [LOSS ...]     Loss function to use.
-  --version VERSION     Version of the network (for MatCNN compatibility)
+  --version VERSION     Version of the network (for semantic compatibility)
   --patience PATIENCE   Use patience after how many epochs
   --image_size IMAGE_SIZE IMAGE_SIZE
                         Size of images processed as x y (necessary for evaluate re-stitching)

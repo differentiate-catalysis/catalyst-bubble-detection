@@ -11,13 +11,13 @@ import torch.multiprocessing as mp
 from arg_checks import check_args
 from conversions import apply_transforms, gen_label_images, gen_targets
 from evaluate import run_apply, run_metrics
-from MatCNN.evaluate import run_apply as mat_run_apply
-from MatCNN.evaluate import run_metrics as mat_run_metrics
-from MatCNN.evaluate import run_stitch
-from MatCNN.image2npy import convert_dir
-from MatCNN.models import model_listing as mat_models
-from MatCNN.optimize import optimize as mat_optimize
-from MatCNN.train import train as mat_train
+from semantic.evaluate import run_apply as mat_run_apply
+from semantic.evaluate import run_metrics as mat_run_metrics
+from semantic.evaluate import run_stitch
+from semantic.image2npy import convert_dir
+from semantic.models import model_listing as mat_models
+from semantic.optimize import optimize as mat_optimize
+from semantic.train import train as mat_train
 from models import model_keys as rcnn_models
 from optimize import optimize
 from train import train_model
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     parser.add_argument('--graph', action='store_true', help='Whether or not to save a plot of the results')
     parser.add_argument('--run_dir', type=str, help='Directory to use for parsl')
     parser.add_argument('--loss', type=str, nargs='*', help='Loss function to use.')
-    parser.add_argument('--version', type=str, help='Version of the network (for MatCNN compatibility)')
+    parser.add_argument('--version', type=str, help='Version of the network (for semantic compatibility)')
     parser.add_argument('--patience', type=int, help='Use patience after how many epochs')
     parser.add_argument('--image_size', type=int, nargs=2, help='Size of images processed as x y (necessary for evaluate re-stitching)')
     parser.add_argument('--num_patches', type=int, nargs='+', help='Number of patches each slice is split into. Set to 0 for automatic choice based on patch and image size.')

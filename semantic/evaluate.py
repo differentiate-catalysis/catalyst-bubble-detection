@@ -22,10 +22,10 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm
 
-from MatCNN.metrics import metrics, bf1score, masks_mapping, bde
-from MatCNN.utils import AverageMeter, Dataset
-from MatCNN.models import get_model
-from MatCNN.losses import loss_mappings
+from semantic.metrics import metrics, bf1score, masks_mapping, bde
+from semantic.utils import AverageMeter, Dataset
+from semantic.models import get_model
+from semantic.losses import loss_mappings
 
 def stitch(image_size, num_patches, patch_size, patch_data, out_path, mode):
     concat = Image.new('RGBA', tuple([image_size[1], image_size[0]]))

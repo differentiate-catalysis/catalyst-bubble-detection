@@ -241,7 +241,7 @@ Training can also be done starting with a previous checkpoint file with pretrain
 
 The `evaluate` mode runs the model on the test set of images, and outputs the resulting loss, Intersection over Union (IoU), and Mean Average Percision (mAP) scores. `evaluate` is effectively a call to `apply` followed by a call to `metrics`.
 
-The `apply` mode runs the model on a set of unlabeled images. This mode can also be used to apply the model to a video file, where the model is run on each frame separately. Use the `video` configuration option to run on one video, or `video_dir` to run on a directory of videos.
+The `apply` mode runs the model on a set of unlabeled images. This mode can also be used to apply the model to a video file, where the model is run on each frame separately. Use the `video` configuration option to run on one video, or `video_dir` to run on a directory of videos. When using a video dataset, results are saved to the same directory that contains the video file(s), in a subdirectory named the same as the video file in question. Within this subdirectory is a subdirectory with the model name, which then contains the labeled frames, CSV files with the resulting bubbles, and the reconstructed video with the bubbles labeled. 
 
 To only obtain metrics for generated outputs, use the `metrics` mode.
 

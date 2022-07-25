@@ -14,11 +14,11 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 
-from MatCNN.metrics import accuracy
-from MatCNN.utils import AverageMeter, Recorder, get_dataloader
-from MatCNN.models import get_model
-from MatCNN.losses import loss_mappings
-from MatCNN.evaluate import evaluate
+from semantic.metrics import accuracy
+from semantic.utils import AverageMeter, Recorder, get_dataloader
+from semantic.models import get_model
+from semantic.losses import loss_mappings
+from semantic.evaluate import evaluate
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 from ray import tune

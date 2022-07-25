@@ -10,10 +10,10 @@ from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
 from types import SimpleNamespace
-from MatCNN.train import train
-from MatCNN.evaluate import run_apply
-from MatCNN.image2npy import convert_dir
-from MatCNN.utils import gen_args
+from semantic.train import train
+from semantic.evaluate import run_apply
+from semantic.image2npy import convert_dir
+from semantic.utils import gen_args
 import random
 import math
 from ray.tune.integration.torch import DistributedTrainableCreator, distributed_checkpoint_dir

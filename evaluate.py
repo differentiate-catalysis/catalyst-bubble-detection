@@ -320,8 +320,10 @@ def run_apply(args: SimpleNamespace) -> Optional[float]:
 
     model_dir = 'saved/%s.pth' % (args.name)#, args.version)
     model.load_state_dict(torch.load(model_dir)['model_state_dict'])
-
-    save_dir = '%s/predictions/%s' % (test_dir, args.name)
+    if args.video:
+        save_dir = os.path.dirname(args.video) + '/' + os.path.splitext(os.path.basename(args.video))[0] + '/' + args.name
+    else:
+        save_dir = '%s/predictions/%s' % (test_dir, args.name)
     needed_subdirs = ['boxes', 'masks', 'labeled_images', 'scores']
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)

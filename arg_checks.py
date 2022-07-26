@@ -22,11 +22,11 @@ needed = {
     "augment": ["transforms", "root", "augment_out"],
     "image2npy": ["root", "num_patches", "run_dir", "name", "slices", "num_patches", "patching_mode", "gpu"],
     "gen_targets": ["jobs", "name", "root", "patch_size"],
-    "train": ["gpu", "opt", "lr", "epoch", "name", "root", "batch_size", "model"],
-    "evaluate": ["root", "name", "gpu", "model"],
-    "apply": ["root", "name", "gpu", "model"],
+    "train": ["gpu", "opt", "lr", "epoch", "name", "root", "batch_size", "model", "detections_per_img"],
+    "evaluate": ["root", "name", "gpu", "model", "detections_per_img"],
+    "apply": ["root", "name", "gpu", "model", "detections_per_img"],
     "metrics": ["root", "name"],
-    "optimize": ["root", "name", "gpu"],
+    "optimize": ["root", "name", "gpu", "detections_per_img"],
     "stitch": ["root", "name"],
 }
 

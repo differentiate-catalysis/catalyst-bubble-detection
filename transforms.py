@@ -38,7 +38,7 @@ class RandomHorizontalFlip(T.RandomHorizontalFlip):
         if torch.rand(1) < self.p:
             image = F.hflip(image)
             if target is not None:
-                width, _ = F._get_image_size(image)
+                width, _ = F.get_image_size(image)
                 target['boxes'][:, [0, 2]] = width - target['boxes'][:, [2, 0]]
                 if 'masks' in target:
                     target['masks'] = target['masks'].flip(-1)
@@ -50,7 +50,7 @@ class RandomVerticalFlip(T.RandomVerticalFlip):
         if torch.rand(1) < self.p:
             image = F.vflip(image)
             if target is not None:
-                _, height = F._get_image_size(image)
+                _, height = F.get_image_size(image)
                 target['boxes'][:, [1, 3]] = height - target['boxes'][:, [3, 1]]
                 if 'masks' in target:
                     target['masks'] = target['masks'].flip(-2)
@@ -86,7 +86,7 @@ def transform_boxes(image: torch.Tensor, target: Dict[str, torch.Tensor], transf
     boxes[:, 7] = boxes[:, 1]
 
     # Center the boxes
-    width, height = F._get_image_size(image)
+    width, height = F.get_image_size(image)
     boxes[:, [0, 2, 4, 6]] -= width / 2
     boxes[:, [1, 3, 5, 7]] -= height / 2
 

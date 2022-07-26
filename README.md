@@ -282,6 +282,8 @@ retina_net
 simclr_faster_rcnn
 ```
 
+`mask_rcnn` and `faster_rcnn` both also support [version 1 and version 2 weights](https://pytorch.org/vision/master/models.html#instance-segmentation). Use the `model_version` arguments to switch between models. Version 1 is used by default for backwards compatability. 
+
 ### Semantic Segmentation
 
 ```

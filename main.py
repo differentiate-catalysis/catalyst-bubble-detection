@@ -193,6 +193,7 @@ if __name__ == '__main__':
         'augment_out': 'data/augment',
         'data_workers': 0,
         'detections_per_img': 100,
+        'model_version': 1
     }
 
     parser = argparse.ArgumentParser()
@@ -252,6 +253,7 @@ if __name__ == '__main__':
     parser.add_argument('--simclr_checkpoint', type=str, help='Weights for SimCLR pre-trained ResNet')
     parser.add_argument('--augment_out', type=str, help='Output directory for augment mode')
     parser.add_argument('--detections_per_img', type=int, help='Max number of regions proposed by the RoI heads')
+    parser.add_argument('--model_version', type=int, help='Version of MaskRCNN and FasterRCNN models to use, defaults to version 1')
 
     args = parser.parse_args()
     if args.config:

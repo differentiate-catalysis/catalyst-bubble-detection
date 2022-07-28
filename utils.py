@@ -183,12 +183,21 @@ class VideoDataset(torch.utils.data.Dataset):
         metadata = self.reader.get_metadata()
         self.transform = get_transforms(True, ['clahe'])
         self.length = ceil(metadata['video']['duration'][0] * metadata['video']['fps'][0])
+        self.overfill = False
 
     def __getitem__(self, index):
         target = None
         # start = time.time()
-        image = next(self.reader)['data']
+        if not self.overfill:
+            try:
+                image = next(self.reader)['data']
+            except StopIteration:
+                self.reader.seek(0)
+                image = next(self.reader)['data']
+                self.overfill = True
         image = to_pil_image(image, mode='RGB')
+        if self.overfill:
+            image = torch.zeros(image.shape)
         image, _ = self.transform(image)
         # print('Dataloading took %f seconds' % (time.time() - start))
         if index == self.length - 1:

@@ -9,11 +9,11 @@ optional = {
     "augment": [],
     "image2npy": ["jobs", "test_set", "train_set", "val_set", "prompt", "split", "patch_size", "overlap_size"],
     "gen_targets": ["prompt", "run_dir", "split", "save", "train_set", "test_set", "val_set"],
-    "train": ["gamma", "save", "num_images", "mp", "world_size", "nr", "amp", "momentum", "checkpoint", "prompt", "ray_checkpoint_dir", "graph", "imagenet_stats", "stats_file", "video", "image_size", "simclr_checkpoint", "loss", "blocks", "aug", "transforms", "patience", "collect", "version", "data_workers"],
-    "evaluate": ["video", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "slices", "clear_predictions"],
-    "apply": ["video", "video_dir", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "mask"],
+    "train": ["gamma", "save", "num_images", "mp", "world_size", "nr", "amp", "momentum", "checkpoint", "prompt", "ray_checkpoint_dir", "graph", "imagenet_stats", "stats_file", "video", "image_size", "simclr_checkpoint", "loss", "blocks", "aug", "transforms", "patience", "collect", "version", "data_workers", "model_version"],
+    "evaluate": ["video", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "slices", "clear_predictions", "model_version"],
+    "apply": ["video", "video_dir", "test_dir", "mp", "imagenet_stats", "stats_file", "image_size", "simclr_checkpoint", "amp", "patch_size", "overlap_size", "num_patches", "patching_mode", "loss", "blocks", "transforms", "version", "mask", "model_version"],
     "metrics": ["test_dir", "mask"],
-    "optimize": ["min_lr_hpo", "max_lr_hpo", "min_momentum_hpo", "max_momentum_hpo", "min_epochs_hpo", "max_epochs_hpo", "sampling_models_hpo", "optimizers_hpo", "min_patch_size_hpo", "max_patch_size_hpo", "min_batch_size_hpo", "max_batch_size_hpo", "transforms", "min_gamma_hpo", "max_gamma_hpo", "max_epochs", "mp", "jobs", "num_samples_hpo", "resume_hpo", "patch_size", "losses", "sampling_slices", "slices", "min_overlap_size", "max_overlap_size", "sampling_patching_modes"],
+    "optimize": ["min_lr_hpo", "max_lr_hpo", "min_momentum_hpo", "max_momentum_hpo", "min_epochs_hpo", "max_epochs_hpo", "sampling_models_hpo", "optimizers_hpo", "min_patch_size_hpo", "max_patch_size_hpo", "min_batch_size_hpo", "max_batch_size_hpo", "transforms", "min_gamma_hpo", "max_gamma_hpo", "max_epochs", "mp", "jobs", "num_samples_hpo", "resume_hpo", "patch_size", "losses", "sampling_slices", "slices", "min_overlap_size", "max_overlap_size", "sampling_patching_modes", "model_version"],
     "stitch": ["test_dir", "patch_size", "overlap_size", "num_patches", "patching_mode", "image_size", "version", "overlay", "slices", "clear_predictions"]
 }
 

@@ -191,6 +191,8 @@ def optimize(args: SimpleNamespace):
         config_out['name'] = '%s_optimized' % args.name
         config_out['version'] = 0
         config_out['test_dir'] = 'test'
+        config_out['detections_per_img'] = args.detections_per_img
+        config_out['model_version'] = args.model_version
         with open(os.path.join(name_dir, 'best.json'), 'w') as f:
             json.dump(config_out, f, indent=4)
         df = result.dataframe(metric='map', mode='max')

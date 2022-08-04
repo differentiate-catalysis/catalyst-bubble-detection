@@ -72,8 +72,8 @@ def main(args: SimpleNamespace, changed: List[str], explicit: List[str]):
                 videos = []
                 video_formats = ['mp4', 'mov']
                 for format in video_formats:
-                    videos.extend(list(Path(args.video_dir).rglob('*.%s' % format.lower())))
-                    videos.extend(list(Path(args.video_dir).rglob('*.%s' % format.upper())))
+                    videos.extend(list(Path(args.video_dir).glob('*.%s' % format.lower())))
+                    videos.extend(list(Path(args.video_dir).glob('*.%s' % format.upper())))
                 videos = set(videos)
                 print('Found %d videos.' % len(videos))
                 root = args.root

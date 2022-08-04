@@ -14,3 +14,4 @@ pandas
 opencv-python
 av
 pycocotools
+kornia
